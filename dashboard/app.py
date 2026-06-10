@@ -53,28 +53,27 @@ st.set_page_config(
 st.markdown("""
 <style>
 /* ═══════════════════════════════════════════
-   ANIMATED BACKGROUND LAYERS
+   VIDEO BACKGROUND
 ═══════════════════════════════════════════ */
-.bg-animate {
+.bg-video {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: -10;
+    object-fit: cover;
+    opacity: 0.22;
+    filter: brightness(0.55) saturate(1.3);
+}
+.bg-overlay {
     position: fixed;
     top: 0; left: 0; width: 100vw; height: 100vh;
-    z-index: -10;
+    z-index: -9;
     background: linear-gradient(
-        135deg,
-        #020810 0%, #041508 25%,
-        #080220 50%, #041508 75%,
-        #020810 100%
+        160deg,
+        rgba(2,8,16,0.78) 0%,
+        rgba(4,15,8,0.72) 50%,
+        rgba(8,2,20,0.78) 100%
     );
-    background-size: 400% 400%;
-    animation: fieldGlow 22s ease infinite;
-}
-
-@keyframes fieldGlow {
-    0%   { background-position: 0% 50%; }
-    25%  { background-position: 100% 0%; }
-    50%  { background-position: 100% 100%; }
-    75%  { background-position: 0% 100%; }
-    100% { background-position: 0% 50%; }
 }
 
 .spotlight {
@@ -187,12 +186,6 @@ st.markdown("""
     position: relative;
     z-index: 1;
     filter: drop-shadow(0 4px 20px rgba(200,16,46,0.5));
-    animation: logoFloat 6s ease-in-out infinite;
-}
-
-@keyframes logoFloat {
-    0%, 100% { transform: translateY(0px) scale(1); }
-    50%       { transform: translateY(-9px) scale(1.03); }
 }
 
 .main-header h1 {
@@ -348,6 +341,99 @@ hr { border-color: rgba(255,255,255,0.06) !important; }
     color: #ffd700 !important;
     text-decoration: none;
 }
+
+/* ═══════════════════════════════════════════
+   TOURNAMENT BRACKET
+═══════════════════════════════════════════ */
+.bracket-wrapper {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 0.5rem 0 1rem;
+}
+.bracket-round {
+    flex: 1;
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+}
+.bracket-round-title {
+    text-align: center;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #ffd700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 6px 4px 10px;
+    border-bottom: 2px solid rgba(200,16,46,0.5);
+    margin-bottom: 6px;
+}
+.bracket-team {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-left: 3px solid rgba(255,255,255,0.15);
+    border-radius: 5px;
+    padding: 5px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 3px;
+    white-space: nowrap;
+}
+.bracket-team.top1 {
+    border-left: 3px solid #ffd700;
+    background: rgba(255,215,0,0.10);
+    color: #ffd700;
+    font-weight: 800;
+    font-size: 0.82rem;
+}
+.bracket-team.top3 {
+    border-left: 3px solid #c8102e;
+    background: rgba(200,16,46,0.09);
+    color: rgba(255,255,255,0.9);
+    font-weight: 600;
+}
+.bracket-prob {
+    font-size: 0.65rem;
+    color: #ffd700;
+    font-weight: 700;
+    opacity: 0.85;
+    margin-left: 6px;
+}
+.group-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    margin-bottom: 1.2rem;
+}
+.group-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-top: 3px solid #c8102e;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+.group-card-title {
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: #ffd700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 5px;
+}
+.group-card-team {
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.8);
+    padding: 2px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.group-card-team.first { color: #ffd700; font-weight: 700; }
+.group-card-team.second { color: rgba(255,255,255,0.65); }
+.group-card-team.eliminated { color: rgba(255,255,255,0.3); font-size: 0.65rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -355,7 +441,10 @@ hr { border-color: rgba(255,255,255,0.06) !important; }
 # Animated background layers
 # ---------------------------------------------------------------------------
 st.markdown("""
-<div class="bg-animate"></div>
+<video class="bg-video" autoplay muted loop playsinline>
+  <source src="https://videos.pexels.com/video-files/34699797/14708218_640_360_60fps.mp4" type="video/mp4">
+</video>
+<div class="bg-overlay"></div>
 <div class="spotlight"></div>
 <div class="pitch-lines"></div>
 
@@ -446,11 +535,12 @@ def results_key() -> str:
 # ---------------------------------------------------------------------------
 # Tabs
 # ---------------------------------------------------------------------------
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🏆 Win Probabilities",
     "📊 Group Predictions",
     "📍 Match Predictor",
     "📈 Live Tracker",
+    "🗺️ Bracket",
 ])
 
 # ============================================================================
@@ -767,6 +857,94 @@ with tab4:
         if st.button("🗑️ Clear all results"):
             st.session_state.actual_results = {}
             st.rerun()
+
+# ============================================================================
+# TAB 5 — Tournament Bracket
+# ============================================================================
+with tab5:
+    st.subheader("🗺️ Tournament Bracket — Predicted Progression")
+    st.caption("Group-stage qualifiers and knockout probabilities from 10,000 Monte Carlo simulations")
+
+    rkey = results_key()
+    all_probs = cached_win_probs(rkey)
+
+    def get_flag(team: str) -> str:
+        return TEAMS.get(team, {}).get("flag", "🏴")
+
+    # ── Group Stage: predicted top-2 per group ────────────────────────────────
+    st.markdown("#### 📋 Group Stage — Predicted Qualifiers")
+    group_html = '<div class="group-grid">'
+    for grp in "ABCDEFGHIJKL":
+        grp_teams = GROUPS.get(grp, [])
+        sorted_grp = sorted(
+            grp_teams,
+            key=lambda t: all_probs.get(t, {}).get("R32", 0),
+            reverse=True,
+        )
+        group_html += f'<div class="group-card"><div class="group-card-title">Group {grp}</div>'
+        for i, team in enumerate(sorted_grp):
+            prob = all_probs.get(team, {}).get("R32", 0)
+            flag = get_flag(team)
+            if i == 0:
+                cls = "first"
+                medal = "🥇"
+            elif i == 1:
+                cls = "second"
+                medal = "🥈"
+            else:
+                cls = "eliminated"
+                medal = "·"
+            group_html += (
+                f'<div class="group-card-team {cls}" title="{team} — R32 prob: {prob:.0%}">'
+                f'{medal} {flag} {team}'
+                f'</div>'
+            )
+        group_html += '</div>'
+    group_html += '</div>'
+    st.markdown(group_html, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ── Knockout Bracket ──────────────────────────────────────────────────────
+    st.markdown("#### 🏆 Knockout Stage — Probability Bracket")
+    st.caption("Each column shows teams ranked by probability of reaching that round")
+
+    rounds_cfg = [
+        ("R32",    "Round of 32",    32),
+        ("R16",    "Round of 16",    16),
+        ("QF",     "Quarter-Finals",  8),
+        ("SF",     "Semi-Finals",     4),
+        ("Final",  "Final",           2),
+        ("Winner", "🏆 Champion",     1),
+    ]
+
+    bracket_html = '<div class="bracket-wrapper">'
+    for rnd_key, rnd_label, n in rounds_cfg:
+        sorted_t = sorted(
+            all_probs.keys(),
+            key=lambda t: all_probs[t].get(rnd_key, 0),
+            reverse=True,
+        )[:n]
+
+        bracket_html += f'<div class="bracket-round"><div class="bracket-round-title">{rnd_label}</div>'
+        for i, team in enumerate(sorted_t):
+            prob = all_probs[team].get(rnd_key, 0)
+            flag = get_flag(team)
+            if i == 0:
+                cls = "bracket-team top1"
+            elif i < 4:
+                cls = "bracket-team top3"
+            else:
+                cls = "bracket-team"
+            bracket_html += (
+                f'<div class="{cls}">'
+                f'<span>{flag} {team}</span>'
+                f'<span class="bracket-prob">{prob:.0%}</span>'
+                f'</div>'
+            )
+        bracket_html += '</div>'
+    bracket_html += '</div>'
+    st.markdown(bracket_html, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Footer
