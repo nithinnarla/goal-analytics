@@ -383,7 +383,7 @@ st.markdown("""
 st.markdown("""
 <div class="main-header">
     <img class="wc-logo"
-         src="https://upload.wikimedia.org/wikipedia/en/5/5c/2026_FIFA_World_Cup_logo.svg"
+         src="https://upload.wikimedia.org/wikipedia/en/thumb/1/17/2026_FIFA_World_Cup_emblem.svg/250px-2026_FIFA_World_Cup_emblem.svg.png"
          alt="FIFA World Cup 2026"
          onerror="this.style.display='none'"/>
     <h1>⚽ GoalAnalytics</h1>
