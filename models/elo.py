@@ -28,9 +28,9 @@ def elo_win_probability(elo_a: float, elo_b: float) -> float:
     return 1.0 / (1.0 + 10.0 ** ((elo_b - elo_a) / ELO_SCALE))
 
 
-def match_probabilities(elo_home: float, elo_away: float) -> Tuple[float, float, float]:
+def match_probabilities(elo_home: float, elo_away: float) -> dict:
     """
-    Returns (p_home_win, p_draw, p_away_win) for a match.
+    Returns {'home_win': p, 'draw': p, 'away_win': p} for a match.
 
     Draw allocation method:
       1. Compute raw win probability for home team (two-outcome Elo)
@@ -56,7 +56,11 @@ def match_probabilities(elo_home: float, elo_away: float) -> Tuple[float, float,
 
     # Normalise (floating point safety)
     total = p_home + p_draw + p_away
-    return p_home / total, p_draw / total, p_away / total
+    return {
+        "home_win": p_home / total,
+        "draw":     p_draw / total,
+        "away_win": p_away / total,
+    }
 
 
 def elo_to_str(elo: float) -> str:

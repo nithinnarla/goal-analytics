@@ -298,8 +298,21 @@ with tab3:
         away_team = st.selectbox("Team B", all_team_names,
                                   index=all_team_names.index("France"))
 
-    venue_input = st.text_input("Venue city (optional, for home advantage)",
-                                 placeholder="e.g. Los Angeles")
+    WC2026_VENUES = [
+        "— Neutral venue —",
+        # 🇺🇸 USA (11 cities)
+        "Los Angeles (USA)", "Dallas (USA)", "New York/New Jersey (USA)",
+        "San Francisco Bay Area (USA)", "Miami (USA)", "Seattle (USA)",
+        "Boston (USA)", "Houston (USA)", "Kansas City (USA)",
+        "Atlanta (USA)", "Philadelphia (USA)",
+        # 🇨🇦 Canada (2 cities)
+        "Toronto (Canada)", "Vancouver (Canada)",
+        # 🇲🇽 Mexico (3 cities)
+        "Mexico City (Mexico)", "Guadalajara (Mexico)", "Monterrey (Mexico)",
+    ]
+    venue_sel = st.selectbox("📍 Venue city (applies host-nation Elo boost)", WC2026_VENUES)
+    # Strip the country suffix before passing to get_elo
+    venue_input = None if venue_sel.startswith("—") else venue_sel.split(" (")[0]
 
     if home_team != away_team:
         elo_h = get_elo(home_team, venue_input or None)
@@ -352,8 +365,7 @@ with tab3:
         heatmap_df = pd.DataFrame(heatmap_data).T
         heatmap_df.columns.name = "Home Goals →"
         heatmap_df.index.name = "Away Goals ↓"
-        st.dataframe(heatmap_df.style.background_gradient(cmap="RdYlGn_r",
-                                                           axis=None),
+        st.dataframe(heatmap_df.style.background_gradient(cmap="RdYlGn_r"),
                      use_container_width=True)
     else:
         st.warning("Select two different teams.")

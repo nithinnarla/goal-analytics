@@ -23,7 +23,7 @@ def main():
     print("\n🏆 Tournament Win Probabilities (Top 20)")
     print(f"{'Rank':<5} {'Team':<28} {'Group':<7} {'Elo':<6} {'Win %'}")
     print("-"*58)
-    for rank, (team, prob) in enumerate(probs[:20], 1):
+    for rank, (team, prob) in enumerate(list(probs.items())[:20], 1):
         flag = TEAMS[team]['flag']
         grp  = TEAM_GROUP[team]
         elo  = TEAMS[team]['elo']

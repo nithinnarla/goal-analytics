@@ -252,10 +252,12 @@ def win_probabilities(
     n: int = 10_000,
     known_results: Optional[Dict[str, Tuple[int, int]]] = None,
     seed: int = 42,
-) -> List[Tuple[str, float]]:
+) -> Dict[str, float]:
     """
-    Convenience: return sorted list of (team, win_probability) desc.
+    Convenience: return dict {team: win_probability}.
+    Sorted descending by probability.
     """
     probs = run_simulations(n=n, known_results=known_results, seed=seed)
-    result = [(team, probs[team].get("Winner", 0.0)) for team in probs]
-    return sorted(result, key=lambda x: x[1], reverse=True)
+    result = {team: probs[team].get("Winner", 0.0) for team in probs}
+    # Return as a regular dict sorted by probability (Python 3.7+ preserves insertion order)
+    return dict(sorted(result.items(), key=lambda x: x[1], reverse=True))
