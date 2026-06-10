@@ -48,53 +48,333 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------------------------
-# Styling
+# Styling — FIFA World Cup 2026 Football Theme
 # ---------------------------------------------------------------------------
 st.markdown("""
 <style>
-    .main-header {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-        padding: 2rem;
-        border-radius: 12px;
-        margin-bottom: 1.5rem;
-        text-align: center;
-    }
-    .main-header h1 { color: #e94560; font-size: 2.5rem; margin: 0; }
-    .main-header p  { color: #a8b2d8; margin: 0.5rem 0 0; }
-    .metric-card {
-        background: #16213e;
-        border: 1px solid #0f3460;
-        border-radius: 10px;
-        padding: 1rem;
-        text-align: center;
-    }
-    .team-prob { font-size: 1.4rem; font-weight: bold; color: #e94560; }
-    .group-header {
-        background: #0f3460;
-        color: white;
-        padding: 0.4rem 0.8rem;
-        border-radius: 6px;
-        font-weight: bold;
-        font-size: 0.95rem;
-    }
-    .match-card {
-        border-left: 4px solid #e94560;
-        padding: 0.5rem 1rem;
-        margin: 0.3rem 0;
-        background: #16213e;
-        border-radius: 0 8px 8px 0;
-    }
-    .winner-badge {
-        background: #e94560;
-        color: white;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 0.8rem;
-    }
-    .accuracy-good { color: #4caf50; font-weight: bold; }
-    .accuracy-bad  { color: #f44336; font-weight: bold; }
-    .accuracy-ok   { color: #ff9800; font-weight: bold; }
+/* ═══════════════════════════════════════════
+   ANIMATED BACKGROUND LAYERS
+═══════════════════════════════════════════ */
+.bg-animate {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: -10;
+    background: linear-gradient(
+        135deg,
+        #020810 0%, #041508 25%,
+        #080220 50%, #041508 75%,
+        #020810 100%
+    );
+    background-size: 400% 400%;
+    animation: fieldGlow 22s ease infinite;
+}
+
+@keyframes fieldGlow {
+    0%   { background-position: 0% 50%; }
+    25%  { background-position: 100% 0%; }
+    50%  { background-position: 100% 100%; }
+    75%  { background-position: 0% 100%; }
+    100% { background-position: 0% 50%; }
+}
+
+.spotlight {
+    position: fixed;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    z-index: -9;
+    background: radial-gradient(
+        ellipse 55% 35% at 30% 30%,
+        rgba(255,255,255,0.025) 0%,
+        transparent 70%
+    );
+    animation: spotMove 14s ease-in-out infinite;
+}
+
+@keyframes spotMove {
+    0%   { transform: translate(0%, 0%); }
+    33%  { transform: translate(40%, 10%); }
+    66%  { transform: translate(15%, 25%); }
+    100% { transform: translate(0%, 0%); }
+}
+
+.pitch-lines {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: -8;
+    background:
+        repeating-linear-gradient(
+            90deg,
+            transparent 0px, transparent 79px,
+            rgba(255,255,255,0.012) 79px, rgba(255,255,255,0.012) 80px
+        ),
+        repeating-linear-gradient(
+            0deg,
+            transparent 0px, transparent 79px,
+            rgba(255,255,255,0.012) 79px, rgba(255,255,255,0.012) 80px
+        );
+    animation: pitchSlide 50s linear infinite;
+}
+
+@keyframes pitchSlide {
+    0%   { background-position: 0px 0px; }
+    100% { background-position: 80px 80px; }
+}
+
+/* ═══════════════════════════════════════════
+   FLOATING FOOTBALL PARTICLES
+═══════════════════════════════════════════ */
+.particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: -7;
+    opacity: 0;
+    user-select: none;
+}
+
+@keyframes floatBall {
+    0%   { transform: translateY(105vh) rotate(0deg);   opacity: 0; }
+    8%   { opacity: 0.18; }
+    88%  { opacity: 0.12; }
+    100% { transform: translateY(-8vh) rotate(540deg);  opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════
+   MAIN HEADER
+═══════════════════════════════════════════ */
+.main-header {
+    background: linear-gradient(135deg, #080f1e 0%, #0f1f10 50%, #0c0820 100%);
+    border: 1px solid rgba(200, 16, 46, 0.25);
+    border-top: 4px solid #c8102e;
+    border-bottom: 2px solid rgba(255, 215, 0, 0.2);
+    padding: 2.5rem 2rem 2rem;
+    border-radius: 16px;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    box-shadow:
+        0 8px 48px rgba(0,0,0,0.7),
+        0 0 100px rgba(200,16,46,0.07),
+        inset 0 1px 0 rgba(255,255,255,0.04);
+    position: relative;
+    overflow: hidden;
+}
+
+.main-header::before {
+    content: '';
+    position: absolute;
+    top: -30%; left: -20%;
+    width: 60%; height: 160%;
+    background: radial-gradient(ellipse, rgba(200,16,46,0.07) 0%, transparent 70%);
+    animation: hdrGlow 5s ease-in-out infinite;
+}
+
+.main-header::after {
+    content: '';
+    position: absolute;
+    top: -30%; right: -20%;
+    width: 60%; height: 160%;
+    background: radial-gradient(ellipse, rgba(0,70,200,0.06) 0%, transparent 70%);
+    animation: hdrGlow 5s ease-in-out infinite reverse;
+}
+
+@keyframes hdrGlow {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50%       { opacity: 1;   transform: scale(1.12); }
+}
+
+.wc-logo {
+    height: 110px;
+    margin-bottom: 0.8rem;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 4px 20px rgba(200,16,46,0.5));
+    animation: logoFloat 6s ease-in-out infinite;
+}
+
+@keyframes logoFloat {
+    0%, 100% { transform: translateY(0px) scale(1); }
+    50%       { transform: translateY(-9px) scale(1.03); }
+}
+
+.main-header h1 {
+    color: #ffffff;
+    font-size: 2.8rem;
+    margin: 0;
+    font-weight: 900;
+    text-shadow: 0 0 40px rgba(200,16,46,0.45), 0 2px 6px rgba(0,0,0,0.9);
+    position: relative;
+    z-index: 1;
+    letter-spacing: -1px;
+}
+
+.hdr-sub {
+    color: rgba(255, 215, 0, 0.9);
+    margin: 0.5rem 0 0.2rem;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    position: relative;
+    z-index: 1;
+}
+
+.hdr-model {
+    color: rgba(255,255,255,0.38);
+    font-size: 0.78rem;
+    margin-top: 0.3rem;
+    position: relative;
+    z-index: 1;
+    letter-spacing: 0.5px;
+}
+
+/* ═══════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════ */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 6px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 12px;
+    padding: 4px;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.stTabs [data-baseweb="tab"] {
+    background: transparent;
+    border-radius: 8px;
+    color: rgba(255,255,255,0.55);
+    font-weight: 600;
+    font-size: 0.88rem;
+    padding: 0.5rem 1.1rem;
+    border: none;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+    color: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.06);
+}
+
+.stTabs [aria-selected="true"] {
+    background: linear-gradient(135deg, #c8102e 0%, #8b0c20 100%) !important;
+    color: white !important;
+    box-shadow: 0 2px 16px rgba(200,16,46,0.5);
+}
+
+/* ═══════════════════════════════════════════
+   METRIC CARDS
+═══════════════════════════════════════════ */
+[data-testid="stMetricValue"] {
+    color: #ffd700 !important;
+    font-size: 1.5rem !important;
+    font-weight: 900 !important;
+}
+
+[data-testid="stMetricLabel"] {
+    color: rgba(255,255,255,0.65) !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+/* ═══════════════════════════════════════════
+   HEADERS & TEXT
+═══════════════════════════════════════════ */
+h2, h3 { color: #ffffff !important; }
+
+h3 {
+    border-left: 3px solid #c8102e;
+    padding-left: 0.7rem;
+    margin-top: 1.5rem !important;
+}
+
+/* ═══════════════════════════════════════════
+   GROUP HEADER
+═══════════════════════════════════════════ */
+.group-header {
+    background: linear-gradient(135deg, #c8102e 0%, #8b0c20 100%);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 2px;
+    margin-bottom: 0.5rem;
+    border-left: 4px solid #ffd700;
+    box-shadow: 0 2px 16px rgba(200,16,46,0.35);
+}
+
+/* ═══════════════════════════════════════════
+   MATCH CARD
+═══════════════════════════════════════════ */
+.match-card {
+    border-left: 4px solid #c8102e;
+    padding: 0.6rem 1rem;
+    margin: 0.3rem 0;
+    background: rgba(255,255,255,0.04);
+    border-radius: 0 10px 10px 0;
+}
+
+/* ═══════════════════════════════════════════
+   MISC
+═══════════════════════════════════════════ */
+.accuracy-good { color: #4caf50; font-weight: bold; }
+.accuracy-bad  { color: #f44336; font-weight: bold; }
+.accuracy-ok   { color: #ff9800; font-weight: bold; }
+
+.winner-badge {
+    background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+    color: #0a0f1e;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.team-prob { font-size: 1.4rem; font-weight: bold; color: #ffd700; }
+
+hr { border-color: rgba(255,255,255,0.06) !important; }
+
+/* ═══════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════ */
+.footer-bar {
+    text-align: center;
+    color: rgba(255,255,255,0.3);
+    font-size: 0.8rem;
+    padding: 1rem 0 0.5rem;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.footer-bar a {
+    color: #ffd700 !important;
+    text-decoration: none;
+}
 </style>
+""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Animated background layers
+# ---------------------------------------------------------------------------
+st.markdown("""
+<div class="bg-animate"></div>
+<div class="spotlight"></div>
+<div class="pitch-lines"></div>
+
+<!-- Floating football particles -->
+<span class="particle" style="left:3%;font-size:1.8rem;animation:floatBall 14s 0s linear infinite;">⚽</span>
+<span class="particle" style="left:10%;font-size:1.1rem;animation:floatBall 11s 2s linear infinite;">⚽</span>
+<span class="particle" style="left:18%;font-size:1.5rem;animation:floatBall 17s 4.5s linear infinite;">⚽</span>
+<span class="particle" style="left:26%;font-size:0.9rem;animation:floatBall 12s 1s linear infinite;">⚽</span>
+<span class="particle" style="left:35%;font-size:2rem;animation:floatBall 19s 6s linear infinite;">⚽</span>
+<span class="particle" style="left:43%;font-size:1.3rem;animation:floatBall 13s 3s linear infinite;">⚽</span>
+<span class="particle" style="left:51%;font-size:1.6rem;animation:floatBall 15s 8s linear infinite;">⚽</span>
+<span class="particle" style="left:59%;font-size:1rem;animation:floatBall 10s 0.5s linear infinite;">⚽</span>
+<span class="particle" style="left:67%;font-size:1.4rem;animation:floatBall 18s 5s linear infinite;">⚽</span>
+<span class="particle" style="left:75%;font-size:0.8rem;animation:floatBall 12s 2.5s linear infinite;">⚽</span>
+<span class="particle" style="left:82%;font-size:1.7rem;animation:floatBall 14s 7s linear infinite;">⚽</span>
+<span class="particle" style="left:90%;font-size:1.2rem;animation:floatBall 11s 1.5s linear infinite;">⚽</span>
+<span class="particle" style="left:97%;font-size:1.5rem;animation:floatBall 16s 4s linear infinite;">⚽</span>
+<span class="particle" style="left:55%;font-size:0.9rem;animation:floatBall 9s 9s linear infinite;">🏆</span>
+<span class="particle" style="left:30%;font-size:1.1rem;animation:floatBall 13s 11s linear infinite;">🏆</span>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
@@ -102,8 +382,13 @@ st.markdown("""
 # ---------------------------------------------------------------------------
 st.markdown("""
 <div class="main-header">
+    <img class="wc-logo"
+         src="https://upload.wikimedia.org/wikipedia/en/5/5c/2026_FIFA_World_Cup_logo.svg"
+         alt="FIFA World Cup 2026"
+         onerror="this.style.display='none'"/>
     <h1>⚽ GoalAnalytics</h1>
-    <p>World Cup 2026 · Elo + Poisson + Monte Carlo · 10,000 simulations</p>
+    <div class="hdr-sub">FIFA World Cup 2026 · Prediction Engine</div>
+    <div class="hdr-model">Elo · Bivariate Poisson · 10,000 Monte Carlo Simulations · 48 Teams · 104 Matches</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -486,11 +771,11 @@ with tab4:
 # ---------------------------------------------------------------------------
 # Footer
 # ---------------------------------------------------------------------------
-st.markdown("---")
 st.markdown(
-    "<div style='text-align:center;color:#666;font-size:0.8rem;'>"
-    "GoalAnalytics · World Cup 2026 · Built with Elo + Poisson + Monte Carlo · "
-    "<a href='https://github.com/nithinnarla/goal-analytics' target='_blank'>GitHub</a>"
+    "<div class='footer-bar'>"
+    "⚽ GoalAnalytics &nbsp;·&nbsp; FIFA World Cup 2026 &nbsp;·&nbsp; "
+    "Elo + Bivariate Poisson + Monte Carlo &nbsp;·&nbsp; "
+    "<a href='https://github.com/nithinnarla/goal-analytics' target='_blank'>GitHub ↗</a>"
     "</div>",
     unsafe_allow_html=True,
 )
