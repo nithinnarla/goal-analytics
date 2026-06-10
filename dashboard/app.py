@@ -41,7 +41,7 @@ from models.monte_carlo import (
 # Page config
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="GoalAnalytics | WC 2026",
+    page_title="Goal Analytics | WC 2026",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -53,16 +53,23 @@ st.set_page_config(
 st.markdown("""
 <style>
 /* ═══════════════════════════════════════════
-   VIDEO BACKGROUND
+   STADIUM BACKGROUND (animated)
+   Note: Streamlit strips <video>/<source> tags from
+   st.markdown, so the "motion picture" wallpaper is
+   rendered as an animated GIF via background-image,
+   which Streamlit's sanitizer allows.
 ═══════════════════════════════════════════ */
-.bg-video {
+.bg-stadium {
     position: fixed;
     top: 0; left: 0;
     width: 100vw; height: 100vh;
     z-index: -10;
-    object-fit: cover;
-    opacity: 0.22;
-    filter: brightness(0.55) saturate(1.3);
+    background-image: url('https://media.giphy.com/media/NW3mG9huWzBj6z02fX/giphy.gif');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    opacity: 0.30;
+    filter: brightness(0.6) saturate(1.35);
 }
 .bg-overlay {
     position: fixed;
@@ -343,65 +350,146 @@ hr { border-color: rgba(255,255,255,0.06) !important; }
 }
 
 /* ═══════════════════════════════════════════
-   TOURNAMENT BRACKET
+   MARCH-MADNESS STYLE TOURNAMENT BRACKET
 ═══════════════════════════════════════════ */
-.bracket-wrapper {
+.mm-bracket {
     display: flex;
-    gap: 6px;
+    align-items: center;
+    gap: 0;
     overflow-x: auto;
-    padding: 0.5rem 0 1rem;
+    padding: 1rem 0.5rem 1.75rem;
+    min-width: max-content;
 }
-.bracket-round {
-    flex: 1;
-    min-width: 150px;
+.mm-half {
+    position: relative;
+    width: 582px;
+    height: 368px;
+    flex-shrink: 0;
+}
+.mm-half.mm-mirror { transform: scaleX(-1); }
+.mm-half.mm-mirror .mm-box { transform: scaleX(-1); }
+.mm-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    overflow: visible;
+}
+.mm-box {
+    position: absolute;
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.mm-box2 { border-left: 3px solid #c8102e; }
+.mm-box1 {
+    border-left: 3px solid #ffd700;
+    background: rgba(255,215,0,0.07);
+    display: flex;
+    align-items: center;
+}
+.mm-row, .mm-row-lg {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 6px;
+    font-size: 0.62rem;
+    line-height: 18px;
+    height: 18px;
+    color: rgba(255,255,255,0.8);
+    white-space: nowrap;
+    overflow: hidden;
+}
+.mm-row + .mm-row { border-top: 1px solid rgba(255,255,255,0.06); }
+.mm-row-lg {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #ffd700;
+    height: 100%;
+    width: 100%;
+}
+.mm-flag { margin-right: 5px; }
+.mm-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.mm-pct {
+    color: #ffd700;
+    font-weight: 700;
+    margin-left: 6px;
+    opacity: 0.85;
+    font-size: 0.6rem;
+}
+.mm-row-lg .mm-pct { color: rgba(255,255,255,0.75); }
+.mm-center {
+    flex-shrink: 0;
+    width: 168px;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 12px;
 }
-.bracket-round-title {
+.mm-final-label {
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 4px;
+    color: #c8102e;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+.mm-final-box {
+    width: 100%;
+    height: 24px;
+    border: 1px solid rgba(255,255,255,0.09);
+    border-left: 3px solid #ffd700;
+    border-radius: 6px;
+    background: rgba(255,215,0,0.07);
+    display: flex;
+    align-items: center;
+}
+.mm-champion {
+    margin-top: 8px;
     text-align: center;
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #ffd700;
+    background: rgba(255,215,0,0.12);
+    border: 1px solid rgba(255,215,0,0.4);
+    border-radius: 8px;
+    padding: 12px 8px;
+    width: 100%;
+}
+.mm-champ-pct {
     font-size: 0.65rem;
+    color: rgba(255,255,255,0.75);
+    font-weight: 600;
+    margin-top: 4px;
+}
+.mm-round-labels {
+    display: flex;
+    width: 582px;
+    flex-shrink: 0;
+}
+.mm-round-labels span {
+    width: 132px;
+    margin-right: 18px;
+    text-align: center;
+    font-size: 0.6rem;
     font-weight: 800;
     color: #ffd700;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    padding: 6px 4px 10px;
-    border-bottom: 2px solid rgba(200,16,46,0.5);
-    margin-bottom: 6px;
 }
-.bracket-team {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-left: 3px solid rgba(255,255,255,0.15);
-    border-radius: 5px;
-    padding: 5px 8px;
+.mm-round-labels.mm-mirror { flex-direction: row-reverse; }
+.mm-round-labels.mm-mirror span { margin-right: 0; margin-left: 18px; }
+.mm-round-labels span:last-child { margin-right: 0; }
+.mm-round-labels.mm-mirror span:last-child { margin-left: 0; }
+.mm-labels-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    font-size: 0.72rem;
-    color: rgba(255,255,255,0.75);
-    margin-bottom: 3px;
-    white-space: nowrap;
+    overflow-x: auto;
+    min-width: max-content;
 }
-.bracket-team.top1 {
-    border-left: 3px solid #ffd700;
-    background: rgba(255,215,0,0.10);
-    color: #ffd700;
-    font-weight: 800;
-    font-size: 0.82rem;
-}
-.bracket-team.top3 {
-    border-left: 3px solid #c8102e;
-    background: rgba(200,16,46,0.09);
-    color: rgba(255,255,255,0.9);
-    font-weight: 600;
-}
-.bracket-prob {
-    font-size: 0.65rem;
-    color: #ffd700;
-    font-weight: 700;
-    opacity: 0.85;
-    margin-left: 6px;
-}
+.mm-labels-row .mm-center { visibility: hidden; }
 .group-grid {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
@@ -441,9 +529,7 @@ hr { border-color: rgba(255,255,255,0.06) !important; }
 # Animated background layers
 # ---------------------------------------------------------------------------
 st.markdown("""
-<video class="bg-video" autoplay muted loop playsinline>
-  <source src="https://videos.pexels.com/video-files/34699797/14708218_640_360_60fps.mp4" type="video/mp4">
-</video>
+<div class="bg-stadium"></div>
 <div class="bg-overlay"></div>
 <div class="spotlight"></div>
 <div class="pitch-lines"></div>
@@ -475,7 +561,7 @@ st.markdown("""
          src="https://upload.wikimedia.org/wikipedia/en/thumb/1/17/2026_FIFA_World_Cup_emblem.svg/250px-2026_FIFA_World_Cup_emblem.svg.png"
          alt="FIFA World Cup 2026"
          onerror="this.style.display='none'"/>
-    <h1>⚽ GoalAnalytics</h1>
+    <h1>⚽ Goal Analytics</h1>
     <div class="hdr-sub">FIFA World Cup 2026 · Prediction Engine</div>
     <div class="hdr-model">Elo · Bivariate Poisson · 10,000 Monte Carlo Simulations · 48 Teams · 104 Matches</div>
 </div>
@@ -905,53 +991,133 @@ with tab5:
 
     st.markdown("---")
 
-    # ── Knockout Bracket ──────────────────────────────────────────────────────
-    st.markdown("#### 🏆 Knockout Stage — Probability Bracket")
-    st.caption("Each column shows teams ranked by probability of reaching that round")
+    # ── Knockout Bracket (March-Madness style) ────────────────────────────────
+    st.markdown("#### 🏆 Knockout Stage — Bracket")
+    st.caption("Seeded matchups from Round of 32 through the Final, by simulated advancement probability")
 
-    rounds_cfg = [
-        ("R32",    "Round of 32",    32),
-        ("R16",    "Round of 16",    16),
-        ("QF",     "Quarter-Finals",  8),
-        ("SF",     "Semi-Finals",     4),
-        ("Final",  "Final",           2),
-        ("Winner", "🏆 Champion",     1),
-    ]
+    def render_mm_bracket(all_probs, get_flag):
+        BOX_H   = 36     # team-pair box height (2 rows x 18px)
+        SLOT0   = 46     # R32 slot height
+        MATCH_W = 132    # box width
+        RW      = 150    # round width (box + gap)
+        GAP     = RW - MATCH_W
+        HALF_H  = 368    # total height of one half (8 * SLOT0)
 
-    bracket_html = '<div class="bracket-wrapper">'
-    for rnd_key, rnd_label, n in rounds_cfg:
-        sorted_t = sorted(
-            all_probs.keys(),
-            key=lambda t: all_probs[t].get(rnd_key, 0),
-            reverse=True,
-        )[:n]
+        def top(rnd, n):
+            return sorted(
+                all_probs.keys(),
+                key=lambda t: all_probs[t].get(rnd, 0),
+                reverse=True,
+            )[:n]
 
-        bracket_html += f'<div class="bracket-round"><div class="bracket-round-title">{rnd_label}</div>'
-        for i, team in enumerate(sorted_t):
-            prob = all_probs[team].get(rnd_key, 0)
+        r32    = top("R32", 32)
+        r16    = top("R16", 16)
+        qf     = top("QF", 8)
+        sf     = top("SF", 4)
+        final2 = top("Final", 2)
+        champ  = top("Winner", 1)[0]
+
+        def half_data(side):
+            if side == "L":
+                return r32[:16], r16[:8], qf[:4], sf[:2], final2[0]
+            return r32[16:32], r16[8:16], qf[4:8], sf[2:4], final2[1]
+
+        def team_row(team, rnd_key, big=False):
+            prob = all_probs.get(team, {}).get(rnd_key, 0)
             flag = get_flag(team)
-            if i == 0:
-                cls = "bracket-team top1"
-            elif i < 4:
-                cls = "bracket-team top3"
-            else:
-                cls = "bracket-team"
-            bracket_html += (
+            cls = "mm-row-lg" if big else "mm-row"
+            return (
                 f'<div class="{cls}">'
-                f'<span>{flag} {team}</span>'
-                f'<span class="bracket-prob">{prob:.0%}</span>'
+                f'<span class="mm-flag">{flag}</span>'
+                f'<span class="mm-name">{team}</span>'
+                f'<span class="mm-pct">{prob:.0%}</span>'
                 f'</div>'
             )
-        bracket_html += '</div>'
-    bracket_html += '</div>'
-    st.markdown(bracket_html, unsafe_allow_html=True)
+
+        def render_half(side):
+            teams_r32, teams_r16, teams_qf, teams_sf, finalist = half_data(side)
+
+            y_r32 = [i * SLOT0 + SLOT0 / 2 for i in range(8)]
+            y_r16 = [(y_r32[2 * i] + y_r32[2 * i + 1]) / 2 for i in range(4)]
+            y_qf  = [(y_r16[2 * i] + y_r16[2 * i + 1]) / 2 for i in range(2)]
+            y_sf  = [(y_qf[0] + y_qf[1]) / 2]
+
+            x_r32, x_r16, x_qf, x_sf = 0, RW, 2 * RW, 3 * RW
+
+            html = '<div class="mm-half' + (' mm-mirror' if side == "R" else '') + '">'
+
+            svg = f'<svg class="mm-svg" viewBox="0 0 582 {HALF_H}" preserveAspectRatio="none">'
+            for x_prev, y_prev, x_next, y_next in (
+                (x_r32, y_r32, x_r16, y_r16),
+                (x_r16, y_r16, x_qf, y_qf),
+                (x_qf, y_qf, x_sf, y_sf),
+            ):
+                xr = x_prev + MATCH_W
+                xm = xr + GAP / 2
+                xl = x_next
+                for j in range(len(y_next)):
+                    yp1, yp2 = y_prev[2 * j], y_prev[2 * j + 1]
+                    yc = y_next[j]
+                    svg += (
+                        f'<polyline points="{xr},{yp1} {xm},{yp1} {xm},{yp2} {xr},{yp2}" '
+                        'fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>'
+                    )
+                    svg += (
+                        f'<polyline points="{xm},{yc} {xl},{yc}" '
+                        'fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>'
+                    )
+            svg += '</svg>'
+            html += svg
+
+            def box(x, y, t1, t2, rnd_key, extra_cls=""):
+                return (
+                    f'<div class="mm-box {extra_cls}" '
+                    f'style="left:{x}px; top:{y - BOX_H / 2}px; width:{MATCH_W}px; height:{BOX_H}px;">'
+                    + team_row(t1, rnd_key) + team_row(t2, rnd_key) + '</div>'
+                )
+
+            for i in range(8):
+                html += box(x_r32, y_r32[i], teams_r32[2 * i], teams_r32[2 * i + 1], "R32")
+            for i in range(4):
+                html += box(x_r16, y_r16[i], teams_r16[2 * i], teams_r16[2 * i + 1], "R16")
+            for i in range(2):
+                html += box(x_qf, y_qf[i], teams_qf[2 * i], teams_qf[2 * i + 1], "QF", "mm-box2")
+            html += box(x_sf, y_sf[0], teams_sf[0], teams_sf[1], "SF", "mm-box2")
+
+            html += '</div>'
+            return html, finalist
+
+        round_labels = ["Round of 32", "Round of 16", "Quarter-Finals", "Semi-Finals"]
+        labels_left = '<div class="mm-round-labels">' + ''.join(f'<span>{l}</span>' for l in round_labels) + '</div>'
+        labels_right = '<div class="mm-round-labels mm-mirror">' + ''.join(f'<span>{l}</span>' for l in round_labels) + '</div>'
+        labels_row = f'<div class="mm-labels-row">{labels_left}<div class="mm-center"></div>{labels_right}</div>'
+
+        left_html, left_finalist = render_half("L")
+        right_html, right_finalist = render_half("R")
+        champ_prob = all_probs.get(champ, {}).get("Winner", 0)
+
+        center = (
+            '<div class="mm-center">'
+            '<div class="mm-final-label">Final</div>'
+            f'<div class="mm-final-box">{team_row(left_finalist, "Final", big=True)}</div>'
+            f'<div class="mm-final-box">{team_row(right_finalist, "Final", big=True)}</div>'
+            '<div class="mm-champion">'
+            f'🏆 {get_flag(champ)} {champ}'
+            f'<div class="mm-champ-pct">Champion · {champ_prob:.0%}</div>'
+            '</div>'
+            '</div>'
+        )
+
+        return labels_row + f'<div class="mm-bracket">{left_html}{center}{right_html}</div>'
+
+    st.markdown(render_mm_bracket(all_probs, get_flag), unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Footer
 # ---------------------------------------------------------------------------
 st.markdown(
     "<div class='footer-bar'>"
-    "⚽ GoalAnalytics &nbsp;·&nbsp; FIFA World Cup 2026 &nbsp;·&nbsp; "
+    "⚽ Goal Analytics &nbsp;·&nbsp; FIFA World Cup 2026 &nbsp;·&nbsp; "
     "Elo + Bivariate Poisson + Monte Carlo &nbsp;·&nbsp; "
     "<a href='https://github.com/nithinnarla/goal-analytics' target='_blank'>GitHub ↗</a>"
     "</div>",
