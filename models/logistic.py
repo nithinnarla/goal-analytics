@@ -56,7 +56,6 @@ class LogisticMatchPredictor:
                 ("scaler", StandardScaler()),
                 ("clf", LogisticRegression(
                     C=C,
-                    multi_class="multinomial",
                     solver="lbfgs",
                     max_iter=max_iter,
                     random_state=42,
