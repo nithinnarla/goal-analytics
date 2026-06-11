@@ -418,6 +418,17 @@ hr { border-color: rgba(255,255,255,0.06) !important; }
     font-size: 0.6rem;
 }
 .mm-row-lg .mm-pct { color: rgba(255,255,255,0.75); }
+.mm-row.mm-winner, .mm-row-lg.mm-winner {
+    background: rgba(255,215,0,0.12);
+}
+.mm-row.mm-winner .mm-name, .mm-row-lg.mm-winner .mm-name {
+    color: #ffd700;
+    font-weight: 800;
+}
+.mm-row.mm-winner .mm-pct, .mm-row-lg.mm-winner .mm-pct { color: #ffd700; opacity: 1; }
+.mm-row:not(.mm-winner) .mm-name, .mm-row:not(.mm-winner) .mm-flag {
+    opacity: 0.5;
+}
 .mm-center {
     flex-shrink: 0;
     width: 168px;
@@ -993,7 +1004,7 @@ with tab5:
 
     # ── Knockout Bracket (March-Madness style) ────────────────────────────────
     st.markdown("#### 🏆 Knockout Stage — Bracket")
-    st.caption("Seeded matchups from Round of 32 through the Final, by simulated advancement probability")
+    st.caption("Projected bracket — at every match the team with the higher probability of reaching the next round (highlighted in gold) advances along the connector to the next round's box")
 
     def render_mm_bracket(all_probs, get_flag):
         BOX_H   = 36     # team-pair box height (2 rows x 18px)
@@ -1003,29 +1014,39 @@ with tab5:
         GAP     = RW - MATCH_W
         HALF_H  = 368    # total height of one half (8 * SLOT0)
 
-        def top(rnd, n):
-            return sorted(
-                all_probs.keys(),
-                key=lambda t: all_probs[t].get(rnd, 0),
-                reverse=True,
-            )[:n]
+        # NCAA-style 16-seed bracket order (0-indexed): 1v16, 8v9, 4v13, 5v12, 2v15, 7v10, 3v14, 6v11
+        SEED_ORDER = [0, 15, 7, 8, 3, 12, 4, 11, 1, 14, 6, 9, 2, 13, 5, 10]
 
-        r32    = top("R32", 32)
-        r16    = top("R16", 16)
-        qf     = top("QF", 8)
-        sf     = top("SF", 4)
-        final2 = top("Final", 2)
-        champ  = top("Winner", 1)[0]
+        teams32 = sorted(
+            all_probs.keys(),
+            key=lambda t: all_probs[t].get("R32", 0),
+            reverse=True,
+        )[:32]
+        left16  = [teams32[i] for i in SEED_ORDER]
+        right16 = [teams32[16 + i] for i in SEED_ORDER]
 
-        def half_data(side):
-            if side == "L":
-                return r32[:16], r16[:8], qf[:4], sf[:2], final2[0]
-            return r32[16:32], r16[8:16], qf[4:8], sf[2:4], final2[1]
+        def winner(a, b, decide_key):
+            pa = all_probs.get(a, {}).get(decide_key, 0)
+            pb = all_probs.get(b, {}).get(decide_key, 0)
+            return a if pa >= pb else b
 
-        def team_row(team, rnd_key, big=False):
-            prob = all_probs.get(team, {}).get(rnd_key, 0)
+        def build_half(seed16):
+            r32_matches = [(seed16[2 * i], seed16[2 * i + 1]) for i in range(8)]
+            r32_winners = [winner(a, b, "R16") for a, b in r32_matches]
+            r16_matches = [(r32_winners[2 * i], r32_winners[2 * i + 1]) for i in range(4)]
+            r16_winners = [winner(a, b, "QF") for a, b in r16_matches]
+            qf_matches  = [(r16_winners[2 * i], r16_winners[2 * i + 1]) for i in range(2)]
+            qf_winners  = [winner(a, b, "SF") for a, b in qf_matches]
+            sf_match    = (qf_winners[0], qf_winners[1])
+            sf_winner   = winner(sf_match[0], sf_match[1], "Final")
+            return r32_matches, r32_winners, r16_matches, r16_winners, qf_matches, qf_winners, sf_match, sf_winner
+
+        def team_row(team, decide_key, win_team=None, big=False):
+            prob = all_probs.get(team, {}).get(decide_key, 0)
             flag = get_flag(team)
             cls = "mm-row-lg" if big else "mm-row"
+            if win_team is not None and team == win_team:
+                cls += " mm-winner"
             return (
                 f'<div class="{cls}">'
                 f'<span class="mm-flag">{flag}</span>'
@@ -1034,8 +1055,9 @@ with tab5:
                 f'</div>'
             )
 
-        def render_half(side):
-            teams_r32, teams_r16, teams_qf, teams_sf, finalist = half_data(side)
+        def render_half(side, seed16):
+            (r32_matches, r32_winners, r16_matches, r16_winners,
+             qf_matches, qf_winners, sf_match, sf_winner) = build_half(seed16)
 
             y_r32 = [i * SLOT0 + SLOT0 / 2 for i in range(8)]
             y_r16 = [(y_r32[2 * i] + y_r32[2 * i + 1]) / 2 for i in range(4)]
@@ -1069,40 +1091,44 @@ with tab5:
             svg += '</svg>'
             html += svg
 
-            def box(x, y, t1, t2, rnd_key, extra_cls=""):
+            def box(x, y, t1, t2, decide_key, win_team, extra_cls=""):
                 return (
                     f'<div class="mm-box {extra_cls}" '
                     f'style="left:{x}px; top:{y - BOX_H / 2}px; width:{MATCH_W}px; height:{BOX_H}px;">'
-                    + team_row(t1, rnd_key) + team_row(t2, rnd_key) + '</div>'
+                    + team_row(t1, decide_key, win_team) + team_row(t2, decide_key, win_team) + '</div>'
                 )
 
             for i in range(8):
-                html += box(x_r32, y_r32[i], teams_r32[2 * i], teams_r32[2 * i + 1], "R32")
+                a, b = r32_matches[i]
+                html += box(x_r32, y_r32[i], a, b, "R16", r32_winners[i])
             for i in range(4):
-                html += box(x_r16, y_r16[i], teams_r16[2 * i], teams_r16[2 * i + 1], "R16")
+                a, b = r16_matches[i]
+                html += box(x_r16, y_r16[i], a, b, "QF", r16_winners[i])
             for i in range(2):
-                html += box(x_qf, y_qf[i], teams_qf[2 * i], teams_qf[2 * i + 1], "QF", "mm-box2")
-            html += box(x_sf, y_sf[0], teams_sf[0], teams_sf[1], "SF", "mm-box2")
+                a, b = qf_matches[i]
+                html += box(x_qf, y_qf[i], a, b, "SF", qf_winners[i], "mm-box2")
+            html += box(x_sf, y_sf[0], sf_match[0], sf_match[1], "Final", sf_winner, "mm-box2")
 
             html += '</div>'
-            return html, finalist
+            return html, sf_winner
 
         round_labels = ["Round of 32", "Round of 16", "Quarter-Finals", "Semi-Finals"]
         labels_left = '<div class="mm-round-labels">' + ''.join(f'<span>{l}</span>' for l in round_labels) + '</div>'
         labels_right = '<div class="mm-round-labels mm-mirror">' + ''.join(f'<span>{l}</span>' for l in round_labels) + '</div>'
         labels_row = f'<div class="mm-labels-row">{labels_left}<div class="mm-center"></div>{labels_right}</div>'
 
-        left_html, left_finalist = render_half("L")
-        right_html, right_finalist = render_half("R")
-        champ_prob = all_probs.get(champ, {}).get("Winner", 0)
+        left_html, left_finalist = render_half("L", left16)
+        right_html, right_finalist = render_half("R", right16)
+        champion = winner(left_finalist, right_finalist, "Winner")
+        champ_prob = all_probs.get(champion, {}).get("Winner", 0)
 
         center = (
             '<div class="mm-center">'
             '<div class="mm-final-label">Final</div>'
-            f'<div class="mm-final-box">{team_row(left_finalist, "Final", big=True)}</div>'
-            f'<div class="mm-final-box">{team_row(right_finalist, "Final", big=True)}</div>'
+            f'<div class="mm-final-box">{team_row(left_finalist, "Winner", champion, big=True)}</div>'
+            f'<div class="mm-final-box">{team_row(right_finalist, "Winner", champion, big=True)}</div>'
             '<div class="mm-champion">'
-            f'🏆 {get_flag(champ)} {champ}'
+            f'🏆 {get_flag(champion)} {champion}'
             f'<div class="mm-champ-pct">Champion · {champ_prob:.0%}</div>'
             '</div>'
             '</div>'
