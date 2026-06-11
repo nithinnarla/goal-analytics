@@ -79,6 +79,25 @@ st.markdown("""
     50%  { transform: scale(1.09) translate(-1.5%, -1%); }
     100% { transform: scale(1.05) translate(1.5%, 0.8%); }
 }
+
+/* ═══════════════════════════════════════════
+   Make Streamlit's own containers transparent so
+   the fixed-position background layers above
+   (.bg-stadium, .bg-overlay, .spotlight, etc.)
+   are actually visible instead of being painted
+   over by Streamlit's opaque app background.
+═══════════════════════════════════════════ */
+html, body {
+    background-color: #05070d;
+}
+[data-testid="stAppViewContainer"],
+[data-testid="stHeader"],
+[data-testid="stMain"],
+[data-testid="stBottomBlockContainer"],
+.stApp {
+    background: transparent !important;
+}
+
 .bg-overlay {
     position: fixed;
     top: 0; left: 0; width: 100vw; height: 100vh;
