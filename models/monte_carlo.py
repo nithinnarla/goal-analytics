@@ -18,6 +18,15 @@ from typing import Dict, List, Optional, Tuple
 
 from data.teams import GROUPS, TEAM_GROUP, get_elo
 from data.fixtures import FIXTURES, get_group_fixtures, Fixture
+from data.knockout_fixtures import (
+    FINAL_MATCH,
+    MATCH_INFO,
+    ROUND_OF_LOSER,
+    THIRD_PLACE_MATCH,
+    resolve_r32_pairing,
+    resolve_third_place_assignment,
+    walk_bracket,
+)
 from models.poisson import scoreline_distribution
 
 
@@ -125,13 +134,17 @@ def pick_best_thirds(thirds: List[TeamRecord], n: int = 8) -> List[str]:
 # Knockout simulation
 # ---------------------------------------------------------------------------
 
-def simulate_knockout_match(team_a: str, team_b: str) -> str:
+def simulate_knockout_match(team_a: str, team_b: str, venue_city: Optional[str] = None) -> str:
     """
     Simulate a single knockout match.
     If 90-min result is a draw, simulate penalty shootout (approx. 50-50).
+
+    venue_city, if given, applies the same host-nation Elo boost used for
+    group-stage matches (data.teams.get_elo) when the match is played in
+    Mexico/USA/Canada.
     """
-    elo_a = get_elo(team_a)
-    elo_b = get_elo(team_b)
+    elo_a = get_elo(team_a, venue_city)
+    elo_b = get_elo(team_b, venue_city)
     lh, la = elo_to_lambda(elo_a, elo_b)
     hg, ag = sample_score(lh, la)
 
@@ -146,10 +159,11 @@ def simulate_knockout_match(team_a: str, team_b: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# WC 2026 knockout bracket (simplified linear bracket)
+# WC 2026 knockout bracket (real FIFA bracket — see data/knockout_fixtures.py)
 # ---------------------------------------------------------------------------
-# The official bracket is path-based. We simplify: after round of 32,
-# bracket is seeded by group position in fixed slots.
+# Matches 73-104: 16 Round-of-32 matches resolved from group standings (incl.
+# the "best 3rd place" Annex C-style assignment), then walked through the real
+# bracket tree (R16 -> QF -> SF -> Final, plus the 3rd-place play-off).
 
 def simulate_full_tournament(
     known_results: Optional[Dict[str, Tuple[int, int]]] = None
@@ -157,6 +171,24 @@ def simulate_full_tournament(
     """
     Simulate one full tournament. Returns dict of team -> furthest round reached.
     Possible values: "Group", "R32", "R16", "QF", "SF", "Final", "Winner"
+    """
+    rounds_reached, _ = simulate_full_tournament_detailed(known_results)
+    return rounds_reached
+
+
+def simulate_full_tournament_detailed(
+    known_results: Optional[Dict[str, Tuple[int, int]]] = None
+) -> Tuple[Dict[str, str], Dict[int, Tuple[str, str]]]:
+    """
+    Simulate one full tournament against the real FIFA World Cup 2026
+    knockout bracket (data/knockout_fixtures.py).
+
+    Returns:
+        rounds_reached: {team: furthest round reached}, with values
+            "Group", "R32", "R16", "QF", "SF", "Final", "Winner"
+        match_results: {match_number: (winner, loser)} for matches 73-104
+            (73-88 = Round of 32, 89-96 = Round of 16, 97-100 = Quarter-Finals,
+            101-102 = Semi-Finals, 103 = 3rd place play-off, 104 = Final)
     """
     known = known_results or {}
     rounds_reached: Dict[str, str] = {}
@@ -185,28 +217,33 @@ def simulate_full_tournament(
     # Mark all 32 qualifiers as R32
     for t in qualifiers:
         rounds_reached[t] = "R32"
+    assert len(qualifiers) == 32, f"Expected 32 qualifiers, got {len(qualifiers)}"
 
-    # ── Knockout rounds ───────────────────────────────────────────────────────
-    round_names = ["R32", "R16", "QF", "SF", "Final"]
-    remaining = list(qualifiers)  # 32 teams
-    assert len(remaining) == 32, f"Expected 32 qualifiers, got {len(remaining)}"
+    # ── Real knockout bracket (Matches 73-104) ─────────────────────────────────
+    winners = {g: all_groups_ranked[g][0].team for g in "ABCDEFGHIJKL"}
+    runnersup = {g: all_groups_ranked[g][1].team for g in "ABCDEFGHIJKL"}
+    third_place_team = {g: all_groups_ranked[g][2].team for g in "ABCDEFGHIJKL"}
 
-    for rnd_name in round_names:
-        next_round: List[str] = []
-        random.shuffle(remaining)  # shuffle for bracket randomisation
-        for i in range(0, len(remaining), 2):
-            winner = simulate_knockout_match(remaining[i], remaining[i + 1])
-            loser = remaining[i] if winner == remaining[i + 1] else remaining[i + 1]
-            next_round.append(winner)
-            # Loser is eliminated at this round
-            rounds_reached[loser] = rnd_name
+    qualifying_third_groups = sorted(TEAM_GROUP[t] for t in best_thirds)
+    third_assignment = resolve_third_place_assignment(qualifying_third_groups)
+    r32_pairing = resolve_r32_pairing(winners, runnersup, third_place_team, third_assignment)
 
-        remaining = next_round
+    def decide(team_a: str, team_b: str, match_num: int) -> str:
+        return simulate_knockout_match(team_a, team_b, MATCH_INFO[match_num]["city"])
 
-    # ── Champion ─────────────────────────────────────────────────────────────
-    assert len(remaining) == 1
-    rounds_reached[remaining[0]] = "Winner"
-    return rounds_reached
+    match_results = walk_bracket(r32_pairing, decide)
+
+    # ── Update rounds_reached from match outcomes ──────────────────────────────
+    for m, (winner, loser) in match_results.items():
+        if m == THIRD_PLACE_MATCH:
+            continue  # doesn't change either team's "furthest round" status
+        if m == FINAL_MATCH:
+            rounds_reached[loser] = "Final"
+            rounds_reached[winner] = "Winner"
+        else:
+            rounds_reached[loser] = ROUND_OF_LOSER[m]
+
+    return rounds_reached, match_results
 
 
 # ---------------------------------------------------------------------------

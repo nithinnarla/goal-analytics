@@ -36,6 +36,12 @@ from models.monte_carlo import (
     simulate_group,
     ROUND_ORDER,
 )
+from data.knockout_fixtures import (
+    LEFT_R32_ORDER,
+    RIGHT_R32_ORDER,
+    resolve_r32_pairing,
+    resolve_third_place_assignment,
+)
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -1186,7 +1192,7 @@ with tab5:
     st.markdown("#### 🏆 Knockout Stage — Bracket")
     st.caption("Projected bracket — at every match the team with the higher probability of reaching the next round (highlighted in gold) advances along the connector to the next round's box")
 
-    def render_mm_bracket(all_probs, get_flag, teams32):
+    def render_mm_bracket(all_probs, get_flag, standings, best_thirds_set):
         BOX_H   = 36     # team-pair box height (2 rows x 18px)
         SLOT0   = 46     # R32 slot height
         MATCH_W = 132    # box width
@@ -1194,15 +1200,23 @@ with tab5:
         GAP     = RW - MATCH_W
         HALF_H  = 368    # total height of one half (8 * SLOT0)
 
-        # NCAA-style 16-seed bracket order (0-indexed): 1v16, 8v9, 4v13, 5v12, 2v15, 7v10, 3v14, 6v11
-        SEED_ORDER = [0, 15, 7, 8, 3, 12, 4, 11, 1, 14, 6, 9, 2, 13, 5, 10]
+        # Real FIFA WC2026 Round-of-32 bracket (data/knockout_fixtures.py),
+        # resolved from the same group standings + best-3rd-place wildcards
+        # shown in the "Group Stage — Predicted Qualifiers" panel above, so
+        # the bracket and the group tables always agree on who advances.
+        winners_map = {g: standings[g][0] for g in "ABCDEFGHIJKL"}
+        runnersup_map = {g: standings[g][1] for g in "ABCDEFGHIJKL"}
+        thirds_map = {g: standings[g][2] for g in "ABCDEFGHIJKL"}
 
-        # teams32 (the 32 knockout qualifiers) is computed once in
-        # get_bracket_qualifiers() and shared with the "Group Stage —
-        # Predicted Qualifiers" panel above, so the bracket and the group
-        # tables always agree on who advances.
-        left16  = [teams32[i] for i in SEED_ORDER]
-        right16 = [teams32[16 + i] for i in SEED_ORDER]
+        qualifying_third_groups = sorted(TEAM_GROUP[t] for t in best_thirds_set)
+        third_assignment = resolve_third_place_assignment(qualifying_third_groups)
+        r32_pairing = resolve_r32_pairing(winners_map, runnersup_map, thirds_map, third_assignment)
+
+        # Flatten each half's 8 R32 matches into 16 teams, in the nesting
+        # order build_half() expects (pairs of adjacent entries form one R16
+        # match, pairs of those form one QF match, etc.)
+        left16 = [team for m in LEFT_R32_ORDER for team in r32_pairing[m]]
+        right16 = [team for m in RIGHT_R32_ORDER for team in r32_pairing[m]]
 
         def winner(a, b, decide_key):
             pa = all_probs.get(a, {}).get(decide_key, 0)
@@ -1326,7 +1340,7 @@ with tab5:
         }
         return bracket_html, bracket_info
 
-    bracket_html, bracket_info = render_mm_bracket(all_probs, get_flag, teams32)
+    bracket_html, bracket_info = render_mm_bracket(all_probs, get_flag, standings, best_thirds_set)
     st.markdown(bracket_html, unsafe_allow_html=True)
 
     st.markdown("---")
