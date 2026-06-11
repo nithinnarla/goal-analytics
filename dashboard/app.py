@@ -56,16 +56,17 @@ st.markdown("""
    STADIUM BACKGROUND (animated)
    Note: Streamlit strips <video>/<source> tags from
    st.markdown, so the "motion picture" wallpaper is
-   a packed-stadium photo (Bernabéu, Champions League
-   Final) with a slow Ken-Burns pan/zoom animation to
-   give the "running" motion-picture feel.
+   a packed-stadium photo (Allianz Arena, Munich,
+   sold-out matchday crowd) with a slow Ken-Burns
+   pan/zoom animation to give the "running"
+   motion-picture feel.
 ═══════════════════════════════════════════ */
 .bg-stadium {
     position: fixed;
     top: -3%; left: -3%;
     width: 106vw; height: 106vh;
     z-index: -10;
-    background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/2010_Champions_League_Final_opening_ceremony.jpg/1920px-2010_Champions_League_Final_opening_ceremony.jpg');
+    background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Fu%C3%9Fball-Bundesliga_2021-2022_-_FC_Bayern_M%C3%BCnchen_vs_Borussia_Dortmund_001.jpg/1920px-Fu%C3%9Fball-Bundesliga_2021-2022_-_FC_Bayern_M%C3%BCnchen_vs_Borussia_Dortmund_001.jpg');
     background-size: cover;
     background-position: center center;
     background-repeat: no-repeat;
