@@ -69,8 +69,8 @@ st.markdown("""
     background-size: cover;
     background-position: center center;
     background-repeat: no-repeat;
-    opacity: 0.38;
-    filter: brightness(0.55) saturate(1.35);
+    opacity: 0.55;
+    filter: brightness(0.75) saturate(1.35);
     animation: stadiumPan 45s ease-in-out infinite alternate;
 }
 
@@ -104,9 +104,9 @@ html, body {
     z-index: -9;
     background: linear-gradient(
         160deg,
-        rgba(2,8,16,0.78) 0%,
-        rgba(4,15,8,0.72) 50%,
-        rgba(8,2,20,0.78) 100%
+        rgba(2,8,16,0.32) 0%,
+        rgba(4,15,8,0.26) 50%,
+        rgba(8,2,20,0.32) 100%
     );
 }
 
@@ -559,7 +559,76 @@ hr { border-color: rgba(255,255,255,0.06) !important; }
 }
 .group-card-team.first { color: #ffd700; font-weight: 700; }
 .group-card-team.second { color: rgba(255,255,255,0.65); }
+.group-card-team.third-qualified { color: #7fdbff; font-weight: 600; }
 .group-card-team.eliminated { color: rgba(255,255,255,0.3); font-size: 0.65rem; }
+
+/* Prediction Engine — model cards & Final cross-check (Tab 5) */
+.model-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 1rem;
+}
+.model-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-top: 3px solid #7fdbff;
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+.model-card-title {
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: #7fdbff;
+    margin-bottom: 4px;
+}
+.model-card-body {
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.75);
+    line-height: 1.45;
+}
+.model-card-status {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(127,219,255,0.15);
+    color: #7fdbff;
+}
+.crosscheck-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 0.6rem 0 1.2rem;
+}
+.crosscheck-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+}
+.crosscheck-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.55);
+    margin-bottom: 4px;
+}
+.crosscheck-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #ffd700;
+}
+.crosscheck-sub {
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.6);
+    margin-top: 2px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -601,7 +670,7 @@ st.markdown("""
          onerror="this.style.display='none'"/>
     <h1>⚽ Goal Analytics</h1>
     <div class="hdr-sub">FIFA World Cup 2026 · Prediction Engine</div>
-    <div class="hdr-model">Elo · Bivariate Poisson · 10,000 Monte Carlo Simulations · 48 Teams · 104 Matches</div>
+    <div class="hdr-model">Elo · Bivariate Poisson · Logistic Regression · 10,000 Monte Carlo Simulations · 48 Teams · 104 Matches</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -647,6 +716,82 @@ def cached_group_sim(group: str, results_key: str):
             "p4th": pos_dict[3] / 5000,
         }
     return result
+
+
+# ---------------------------------------------------------------------------
+# Shared group standings + bracket qualifiers
+#
+# Tab 2 ranks each group by avg finishing position (cached_group_sim, 5,000
+# group-only sims). Tab 5's bracket needs the same top-2-per-group order PLUS
+# the 8 best third-placed teams (the "wildcard" route), picked using the
+# Round-of-32 probabilities from the full 10,000-sim Monte Carlo run
+# (cached_win_probs). Computing both here from the SAME inputs guarantees
+# Tab 2 and Tab 5 always show the same qualifiers for every group.
+# ---------------------------------------------------------------------------
+def get_bracket_qualifiers(rkey: str, all_probs: dict):
+    """
+    Returns
+    -------
+    standings       : dict[group] -> list of 4 teams, ordered best-to-worst
+                       (identical ordering to Tab 2's group tables)
+    best_thirds_set : set of the 8 third-placed teams that advance as
+                       wildcards, chosen by Round-of-32 probability
+    teams32         : list of the 32 knockout-stage qualifiers (top-2 per
+                       group + best 8 thirds), seeded by Round-of-32
+                       probability for the bracket
+    """
+    standings = {}
+    third_place_teams = []
+
+    for grp in "ABCDEFGHIJKL":
+        sims = cached_group_sim(grp, rkey)
+        ordered = sorted(GROUPS[grp], key=lambda t: sims[t]["avg_pos"])
+        standings[grp] = ordered
+        third_place_teams.append(ordered[2])
+
+    best_thirds = sorted(
+        third_place_teams,
+        key=lambda t: all_probs.get(t, {}).get("R32", 0),
+        reverse=True,
+    )[:8]
+    best_thirds_set = set(best_thirds)
+
+    auto_qualifiers = [t for grp in "ABCDEFGHIJKL" for t in standings[grp][:2]]
+    teams32 = sorted(
+        auto_qualifiers + best_thirds,
+        key=lambda t: all_probs.get(t, {}).get("R32", 0),
+        reverse=True,
+    )
+
+    return standings, best_thirds_set, teams32
+
+
+# ---------------------------------------------------------------------------
+# Logistic Regression model (cached resource — trained once per session)
+# ---------------------------------------------------------------------------
+@st.cache_resource(show_spinner="Training logistic regression on WC history…")
+def cached_logreg_model():
+    """
+    Train the multinomial logistic-regression match predictor on historical
+    World Cup results. Falls back to an untrained model (which uses a pure
+    Elo-based estimate) if historical data can't be fetched — e.g. no network
+    access on Streamlit Cloud.
+    """
+    from models.logistic import LogisticMatchPredictor
+    try:
+        from data.historical import fetch_results, get_wc_matches, compute_elo_ratings, build_form_lookup
+        df = fetch_results()
+        if df is None:
+            return LogisticMatchPredictor(), False
+        wc_df = get_wc_matches(df)
+        elos = compute_elo_ratings(df)
+        form_lookup = build_form_lookup(df)
+        if wc_df is None or len(wc_df) < 20 or not elos:
+            return LogisticMatchPredictor(), False
+        model = LogisticMatchPredictor.train_from_history(wc_df, elos, form_lookup)
+        return model, model.trained
+    except Exception:
+        return LogisticMatchPredictor(), False
 
 
 # ---------------------------------------------------------------------------
@@ -991,22 +1136,26 @@ with tab5:
 
     rkey = results_key()
     all_probs = cached_win_probs(rkey)
+    standings, best_thirds_set, teams32 = get_bracket_qualifiers(rkey, all_probs)
 
     def get_flag(team: str) -> str:
         return TEAMS.get(team, {}).get("flag", "🏴")
 
-    # ── Group Stage: predicted top-2 per group ────────────────────────────────
+    # ── Group Stage: predicted qualifiers ─────────────────────────────────────
+    # Same ordering as the "Group Predictions" tab (avg finishing position),
+    # plus the 8 best third-placed "wildcard" teams highlighted to match the
+    # bracket below — so the two tabs always agree on who advances.
     st.markdown("#### 📋 Group Stage — Predicted Qualifiers")
+    st.caption(
+        "Top 2 per group advance automatically (🥇🥈). The 8 best third-placed "
+        "teams (🎟️) also advance to the Round of 32 — matches the rankings in "
+        "the Group Predictions tab."
+    )
     group_html = '<div class="group-grid">'
     for grp in "ABCDEFGHIJKL":
-        grp_teams = GROUPS.get(grp, [])
-        sorted_grp = sorted(
-            grp_teams,
-            key=lambda t: all_probs.get(t, {}).get("R32", 0),
-            reverse=True,
-        )
+        ordered = standings[grp]
         group_html += f'<div class="group-card"><div class="group-card-title">Group {grp}</div>'
-        for i, team in enumerate(sorted_grp):
+        for i, team in enumerate(ordered):
             prob = all_probs.get(team, {}).get("R32", 0)
             flag = get_flag(team)
             if i == 0:
@@ -1015,6 +1164,9 @@ with tab5:
             elif i == 1:
                 cls = "second"
                 medal = "🥈"
+            elif i == 2 and team in best_thirds_set:
+                cls = "third-qualified"
+                medal = "🎟️"
             else:
                 cls = "eliminated"
                 medal = "·"
@@ -1033,7 +1185,7 @@ with tab5:
     st.markdown("#### 🏆 Knockout Stage — Bracket")
     st.caption("Projected bracket — at every match the team with the higher probability of reaching the next round (highlighted in gold) advances along the connector to the next round's box")
 
-    def render_mm_bracket(all_probs, get_flag):
+    def render_mm_bracket(all_probs, get_flag, teams32):
         BOX_H   = 36     # team-pair box height (2 rows x 18px)
         SLOT0   = 46     # R32 slot height
         MATCH_W = 132    # box width
@@ -1044,11 +1196,10 @@ with tab5:
         # NCAA-style 16-seed bracket order (0-indexed): 1v16, 8v9, 4v13, 5v12, 2v15, 7v10, 3v14, 6v11
         SEED_ORDER = [0, 15, 7, 8, 3, 12, 4, 11, 1, 14, 6, 9, 2, 13, 5, 10]
 
-        teams32 = sorted(
-            all_probs.keys(),
-            key=lambda t: all_probs[t].get("R32", 0),
-            reverse=True,
-        )[:32]
+        # teams32 (the 32 knockout qualifiers) is computed once in
+        # get_bracket_qualifiers() and shared with the "Group Stage —
+        # Predicted Qualifiers" panel above, so the bracket and the group
+        # tables always agree on who advances.
         left16  = [teams32[i] for i in SEED_ORDER]
         right16 = [teams32[16 + i] for i in SEED_ORDER]
 
@@ -1161,9 +1312,102 @@ with tab5:
             '</div>'
         )
 
-        return labels_row + f'<div class="mm-bracket">{left_html}{center}{right_html}</div>'
+        bracket_html = labels_row + f'<div class="mm-bracket">{left_html}{center}{right_html}</div>'
 
-    st.markdown(render_mm_bracket(all_probs, get_flag), unsafe_allow_html=True)
+        # Expose the predicted finalists/champion so the "Prediction Engine"
+        # section below can run a cross-check on the Final without
+        # recomputing the bracket-walk logic.
+        bracket_info = {
+            "left_finalist": left_finalist,
+            "right_finalist": right_finalist,
+            "champion": champion,
+            "champ_prob": champ_prob,
+        }
+        return bracket_html, bracket_info
+
+    bracket_html, bracket_info = render_mm_bracket(all_probs, get_flag, teams32)
+    st.markdown(bracket_html, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ── Prediction Engine: models behind this bracket ─────────────────────────
+    st.markdown("#### 🧠 Prediction Engine")
+    st.caption(
+        "Every probability on this page comes from the same pipeline — four "
+        "models working together, calibrated on real World Cup history."
+    )
+
+    logreg_model, logreg_trained = cached_logreg_model()
+    logreg_status = "Trained on WC history" if logreg_trained else "Elo fallback (offline)"
+
+    model_html = (
+        '<div class="model-grid">'
+        '<div class="model-card">'
+        '<div class="model-card-title">📐 Elo Ratings</div>'
+        '<div class="model-card-body">Baseline team-strength ratings, '
+        'calibrated from World Cup &amp; international results, with a '
+        '+100 home-advantage boost for Mexico, USA &amp; Canada.</div>'
+        '</div>'
+        '<div class="model-card">'
+        '<div class="model-card-title">📊 Bivariate Poisson</div>'
+        '<div class="model-card-body">Converts Elo gaps into expected goals '
+        'and a full scoreline distribution for every match-up — powers the '
+        'Match Predictor tab.</div>'
+        '</div>'
+        '<div class="model-card">'
+        '<div class="model-card-title">🎲 Monte Carlo (10,000 sims)</div>'
+        '<div class="model-card-body">Replays the group draw, wildcard '
+        'tiebreaks and every knockout round 10,000 times to produce all '
+        'probabilities shown in this bracket.</div>'
+        '</div>'
+        '<div class="model-card">'
+        '<div class="model-card-title">🤖 Logistic Regression</div>'
+        '<div class="model-card-body">Multinomial classifier trained on '
+        'historical World Cup matches — used below as an independent '
+        'cross-check on the Final.</div>'
+        f'<div class="model-card-status">{logreg_status}</div>'
+        '</div>'
+        '</div>'
+    )
+    st.markdown(model_html, unsafe_allow_html=True)
+
+    # ── Final cross-check: Monte Carlo bracket vs. Logistic Regression ────────
+    lf, rf = bracket_info["left_finalist"], bracket_info["right_finalist"]
+    champion, champ_prob = bracket_info["champion"], bracket_info["champ_prob"]
+    logreg_probs = logreg_model.predict(
+        home_elo=get_elo(lf), away_elo=get_elo(rf), is_neutral=True,
+    )
+    logreg_pick = lf if logreg_probs["home_win"] >= logreg_probs["away_win"] else rf
+    agree = "✅ Agrees with Monte Carlo" if logreg_pick == champion else "⚠️ Differs from Monte Carlo"
+
+    st.markdown("##### 🔍 Final Cross-Check — Monte Carlo Bracket vs. Logistic Regression")
+    st.caption(
+        f"The bracket's projected Final is {get_flag(lf)} {lf} vs {get_flag(rf)} {rf}. "
+        "Compare the Monte Carlo simulation's overall champion pick against an "
+        "independent logistic-regression read of that single match."
+    )
+    cc_html = (
+        '<div class="crosscheck-grid">'
+        '<div class="crosscheck-card">'
+        '<div class="crosscheck-label">Monte Carlo · Champion</div>'
+        f'<div class="crosscheck-value">{get_flag(champion)} {champion}</div>'
+        f'<div class="crosscheck-sub">{champ_prob:.0%} of 10,000 simulations</div>'
+        '</div>'
+        '<div class="crosscheck-card">'
+        '<div class="crosscheck-label">Logistic Regression · Final</div>'
+        f'<div class="crosscheck-value">{get_flag(lf)} {logreg_probs["home_win"]:.0%} '
+        f'&nbsp;·&nbsp; {get_flag(rf)} {logreg_probs["away_win"]:.0%}</div>'
+        f'<div class="crosscheck-sub">Draw allocation {logreg_probs["draw"]:.0%} '
+        '(resolved by penalties)</div>'
+        '</div>'
+        '<div class="crosscheck-card">'
+        '<div class="crosscheck-label">Logistic Regression · Pick</div>'
+        f'<div class="crosscheck-value">{get_flag(logreg_pick)} {logreg_pick}</div>'
+        f'<div class="crosscheck-sub">{agree}</div>'
+        '</div>'
+        '</div>'
+    )
+    st.markdown(cc_html, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Footer
@@ -1171,7 +1415,7 @@ with tab5:
 st.markdown(
     "<div class='footer-bar'>"
     "⚽ Goal Analytics &nbsp;·&nbsp; FIFA World Cup 2026 &nbsp;·&nbsp; "
-    "Elo + Bivariate Poisson + Monte Carlo &nbsp;·&nbsp; "
+    "Elo + Bivariate Poisson + Logistic Regression + Monte Carlo &nbsp;·&nbsp; "
     "<a href='https://github.com/nithinnarla/goal-analytics' target='_blank'>GitHub ↗</a>"
     "</div>",
     unsafe_allow_html=True,
