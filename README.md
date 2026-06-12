@@ -33,7 +33,7 @@ This is **Module 1** of a three-part project. Module 2 (player-level squad embed
 | [`martj42/international_results`](https://github.com/martj42/international_results) (`results.csv`, `shootouts.csv`) | Elo rating history, recent-form features, training data for Logistic Regression / Random Forest / XGBoost, and the 2018/2022 backtest ground truth | Full international match history, fetched live via `data/historical.py`; ~25k matches in the "recent era" (2010–present) slice |
 | `data/teams.py` | Pre-tournament Elo ratings, FIFA ranks, confederations, and group assignments for all 48 WC2026 teams | Hand-calibrated from the June 2026 FIFA/Coca-Cola World Ranking and recent results — **separate from** the Elo ratings `compute_elo_ratings()` derives from the historical match log |
 | `data/fixtures.py` | All 72 group-stage fixtures (dates, venues, cities) | |
-| `data/knockout_fixtures.py` | The real WC2026 knockout bracket — Matches 73–104 (Round of 32 → Round of 16 → quarter-finals → semi-finals → final + 3rd-place play-off), including the Annex C-style "best third-placed team" assignment rules | |
+| `data/knockout_fixtures.py` | The real WC2026 knockout bracket — Matches 73–104 (Round of 32 → Round of 16 → quarter-finals → semi-finals → final + 3rd-place play-off), including FIFA's literal Annex C "best third-placed team" assignment table (495/495 verified) | |
 | `data/fifa_rankings.py` | Live FIFA World Ranking, scraped from a public mirror | **Informational only** — does not feed Elo, Poisson, or Monte Carlo |
 
 Team-name aliasing (`data/historical.py`) reconciles naming differences between the `martj42` dataset and `data/teams.py` (e.g. "USA" ↔ "United States", "South Korea" ↔ "Korea Republic"), with accent-stripping for names like "Curaçao" / "Türkiye" / "Côte d'Ivoire".
@@ -113,7 +113,7 @@ Each simulation:
 1. Plays all 72 group-stage matches, sampling scorelines from the Elo→Poisson distribution.
 2. Ranks each group by **points → goal difference → goals for → random tiebreak** (FIFA's head-to-head and disciplinary tiebreakers are *not* implemented — see [Limitations](#9-limitations--future-work)).
 3. Selects the top 2 from each of the 12 groups plus the **best 8 third-placed teams** (ranked by the same points → GD → GF → random criteria) — 32 qualifiers.
-4. Resolves the Round-of-32 pairing against the **real WC2026 bracket** (`data/knockout_fixtures.py`, Matches 73–104), including the Annex C-style assignment of third-placed teams to avoid a team facing its own group's anchor.
+4. Resolves the Round-of-32 pairing against the **real WC2026 bracket** (`data/knockout_fixtures.py`, Matches 73–104), using FIFA's literal Annex C table to assign third-placed teams (avoiding a team facing its own group's anchor).
 5. Walks the bracket through Round of 16 → quarter-finals → semi-finals → final (+ 3rd-place play-off). Drawn knockout matches go to a penalty shootout modelled as 50% ± an Elo-proportional edge, capped to [30%, 70%].
 
 Two simulation counts are used for two different purposes:
