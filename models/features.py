@@ -90,10 +90,17 @@ def build_match_features_df(
     def _form(team: str) -> dict:
         return form_lookup.get(team, {"form": 1.5, "avg_scored": 1.3, "avg_conceded": 1.1})
 
-    for _, row in wc_df.iterrows():
-        hs, as_ = int(row["home_score"]), int(row["away_score"])
-        neutral = bool(row.get("neutral", False))
-        home, away = row["home_team"], row["away_team"]
+    # itertuples() over the relevant columns is dramatically faster than
+    # iterrows() on large frames (~25k rows for the full historical
+    # dataset used by the RF/XGBoost models) while producing identical
+    # output to the row-by-row version.
+    if "neutral" not in wc_df.columns:
+        wc_df = wc_df.assign(neutral=False)
+
+    cols = wc_df[["home_team", "away_team", "home_score", "away_score", "neutral"]]
+    for home, away, hs, as_, neutral in cols.itertuples(index=False, name=None):
+        hs, as_ = int(hs), int(as_)
+        neutral = bool(neutral)
 
         fh, fa = _form(home), _form(away)
         vec = build_feature_row(

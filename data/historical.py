@@ -10,10 +10,13 @@ There was no 1932 World Cup.
 import pandas as pd
 import numpy as np
 import requests
+import unicodedata
 from io import StringIO
 from datetime import datetime
 import warnings
 warnings.filterwarnings("ignore")
+
+from data.teams import all_teams as _teams_py_all_teams
 
 # ─── Public data sources (no authentication required) ────────────────────────
 RESULTS_URL = (
@@ -62,6 +65,77 @@ TEAM_NAME_MAP = {
     "St. Lucia":                  "Saint Lucia",
     "St. Vincent & the Grenadines": "St. Vincent and the Grenadines",
 }
+
+# ---------------------------------------------------------------------------
+# Canonicalize this module's internal team names (the right-hand side of
+# TEAM_NAME_MAP, or the raw martj42 name if unmapped) to the names used in
+# data/teams.py — and therefore by the Elo presets, fixtures, and dashboard.
+#
+# Most of the ~46 WC2026 teams already line up. A couple don't:
+#   - this module:  "USA"          <->  data/teams.py: "United States"
+#   - this module:  "South Korea"  <->  data/teams.py: "Korea Republic"
+#
+# Without this, anything that blends preset Elo (keyed by data/teams.py
+# names) with compute_elo_ratings()/build_form_lookup() output (keyed by
+# this module's names) — e.g. GoalAnalytics_Analysis.py's blended_elos
+# step — silently misses "United States" and "Korea Republic" and falls
+# back to the preset value only, defeating the blend for those teams.
+#
+# compute_elo_ratings() and build_form_lookup() add an alias entry under
+# the data/teams.py name alongside the existing (unchanged) entry — purely
+# additive, nothing is renamed or removed.
+# ---------------------------------------------------------------------------
+TEAMS_PY_NAME_MAP = {
+    # Confirmed: this module's TEAM_NAME_MAP target -> data/teams.py name
+    "USA": "United States",
+    "South Korea": "Korea Republic",
+    # Defensive: raw source-name variants TEAM_NAME_MAP doesn't normalize,
+    # in case they ever appear unmapped in the upstream CSV.
+    "Türkiye": "Turkey",
+    "Turkiye": "Turkey",
+    "Côte d'Ivoire": "Ivory Coast",
+    "Cote d'Ivoire": "Ivory Coast",
+    "Bosnia-Herzegovina": "Bosnia and Herzegovina",
+    "Bosnia & Herzegovina": "Bosnia and Herzegovina",
+}
+
+_TEAMS_PY_TEAMS = set(_teams_py_all_teams())
+
+
+def _strip_accents(s: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+
+
+# Accent-insensitive fallback lookup (e.g. "Curaçao" -> "Curacao").
+_TEAMS_PY_FOLDED = {_strip_accents(t).lower(): t for t in _TEAMS_PY_TEAMS}
+
+
+def _canonical_team_name(name: str) -> str:
+    """
+    Map an internal team name (as produced by fetch_results(), after
+    TEAM_NAME_MAP) to the corresponding name in data/teams.py, where one
+    is known. Falls back to an accent-insensitive match against
+    data/teams.py's 48 WC2026 team names, and finally to `name` unchanged.
+    """
+    if name in TEAMS_PY_NAME_MAP:
+        return TEAMS_PY_NAME_MAP[name]
+    if name in _TEAMS_PY_TEAMS:
+        return name
+    return _TEAMS_PY_FOLDED.get(_strip_accents(name).lower(), name)
+
+
+def _add_teams_py_aliases(d: dict) -> dict:
+    """
+    Additively alias entries in `d` (keyed by this module's team names) to
+    their data/teams.py equivalents, where that differs and isn't already
+    present. Mutates and returns `d`.
+    """
+    for internal_name, value in list(d.items()):
+        canon = _canonical_team_name(internal_name)
+        if canon != internal_name and canon not in d:
+            d[canon] = value
+    return d
+
 
 # Cache
 _results_cache = None
@@ -172,6 +246,20 @@ def compute_elo_ratings(
 
     # Sort chronologically, exclude friendlies for speed if needed
     df = df.sort_values("date").reset_index(drop=True)
+
+    # itertuples() is positional and has no Series.get() fallback, so make
+    # sure the optional columns the loop relies on actually exist first
+    # (mirrors the old row.get("neutral", False) / row.get("tournament", "")
+    # defaults for sources that omit these columns).
+    fill_cols = {}
+    if "neutral" not in df.columns:
+        fill_cols["neutral"] = False
+    if "tournament" not in df.columns:
+        fill_cols["tournament"] = ""
+    if fill_cols:
+        df = df.assign(**fill_cols)
+
+    cols = ["home_team", "away_team", "home_score", "away_score", "neutral", "tournament"]
     elos: dict[str, float] = {}
 
     def get_e(team: str) -> float:
@@ -180,11 +268,12 @@ def compute_elo_ratings(
     def exp_score(elo_a: float, elo_b: float) -> float:
         return 1.0 / (1.0 + 10.0 ** ((elo_b - elo_a) / 400.0))
 
-    for _, row in df.iterrows():
-        home, away = row["home_team"], row["away_team"]
-        hs, as_ = int(row["home_score"]), int(row["away_score"])
-        neutral = bool(row.get("neutral", False))
-        tournament = str(row.get("tournament", ""))
+    # itertuples(name=None) yields plain tuples — roughly an order of
+    # magnitude faster than iterrows() over ~25k+ rows.
+    for home, away, home_score, away_score, neutral, tournament in df[cols].itertuples(index=False, name=None):
+        hs, as_ = int(home_score), int(away_score)
+        neutral = bool(neutral)
+        tournament = str(tournament)
 
         # K factor
         if "World Cup" in tournament and "qualification" not in tournament.lower():
@@ -213,6 +302,12 @@ def compute_elo_ratings(
 
         elos[home] = eh + k * m * (act_h - exp_h)
         elos[away] = ea + k * m * (act_a - exp_a)
+
+    # Additive aliases for data/teams.py naming (e.g. "USA" -> "United
+    # States"), so callers that look Elo up by data/teams.py names — like
+    # GoalAnalytics_Analysis.py's preset/historical blend — get a real
+    # historical value instead of silently falling back to the preset.
+    _add_teams_py_aliases(elos)
 
     return elos
 
@@ -262,13 +357,41 @@ def get_recent_form(
     }
 
 
+def _build_long_form(df: pd.DataFrame, cutoff: pd.Timestamp) -> pd.DataFrame:
+    """
+    Reshape `df` (one row per match, home/away columns) into long format —
+    one row per team per match — restricted to matches strictly before
+    `cutoff`, sorted chronologically. Used by build_form_lookup() to
+    compute recent-form stats for every team in a couple of vectorized
+    groupby passes instead of one get_recent_form() full-dataframe scan
+    per team (O(n_teams × n_matches) -> O(n_matches)).
+    """
+    pre = df[df["date"] < cutoff]
+
+    home = pre[["date", "home_team", "home_score", "away_score"]].rename(
+        columns={"home_team": "team", "home_score": "scored", "away_score": "conceded"}
+    )
+    away = pre[["date", "away_team", "away_score", "home_score"]].rename(
+        columns={"away_team": "team", "away_score": "scored", "home_score": "conceded"}
+    )
+    long_df = pd.concat([home, away], ignore_index=True)
+    long_df["pts"] = np.where(
+        long_df["scored"] > long_df["conceded"], 3,
+        np.where(long_df["scored"] == long_df["conceded"], 1, 0),
+    )
+    # Descending + later groupby().head(n) mirrors get_recent_form()'s
+    # sort_values("date", ascending=False).head(n_matches) exactly,
+    # including stable tie-breaking for same-date matches.
+    return long_df.sort_values("date", ascending=False)
+
+
 def build_form_lookup(
     df: pd.DataFrame | None = None,
     as_of: str = "2026-06-01",
     n: int = 10,
 ) -> dict[str, dict]:
     """
-    Pre-compute recent form for all teams in the dataset (expensive but cached).
+    Pre-compute recent form for all teams in the dataset (vectorized).
     Returns dict: team_name → form_dict
     """
     if df is None:
@@ -279,8 +402,30 @@ def build_form_lookup(
     cutoff = pd.to_datetime(as_of)
     teams = set(df["home_team"].unique()) | set(df["away_team"].unique())
     print(f"Computing recent form for {len(teams)} teams (last {n} matches before {as_of})...")
-    lookup = {}
+
+    default = {"form": 1.0, "avg_scored": 1.3, "avg_conceded": 1.1, "n_matches": 0}
+
+    long_df = _build_long_form(df, cutoff)
+    recent = long_df.groupby("team", sort=False).head(n)
+    agg = recent.groupby("team")[["pts", "scored", "conceded"]].mean()
+    counts = recent.groupby("team").size()
+
+    lookup: dict[str, dict] = {}
     for t in teams:
-        lookup[t] = get_recent_form(t, as_of_date=cutoff, n_matches=n, df=df)
+        if t in agg.index:
+            lookup[t] = {
+                "form":         float(agg.loc[t, "pts"]),
+                "avg_scored":   float(agg.loc[t, "scored"]),
+                "avg_conceded": float(agg.loc[t, "conceded"]),
+                "n_matches":    int(counts.loc[t]),
+            }
+        else:
+            lookup[t] = default.copy()
+
+    # Additive aliases for data/teams.py naming (e.g. "South Korea" ->
+    # "Korea Republic"), matching compute_elo_ratings()'s aliasing so
+    # callers can look form up by either naming convention.
+    _add_teams_py_aliases(lookup)
+
     print(f"  ✓ Done.")
     return lookup
