@@ -42,6 +42,7 @@ from data.knockout_fixtures import (
     resolve_r32_pairing,
     resolve_third_place_assignment,
 )
+from data.fifa_rankings import get_fifa_rankings_table
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -158,24 +159,6 @@ html, body {
 @keyframes pitchSlide {
     0%   { background-position: 0px 0px; }
     100% { background-position: 80px 80px; }
-}
-
-/* ═══════════════════════════════════════════
-   FLOATING FOOTBALL PARTICLES
-═══════════════════════════════════════════ */
-.particle {
-    position: fixed;
-    pointer-events: none;
-    z-index: -7;
-    opacity: 0;
-    user-select: none;
-}
-
-@keyframes floatBall {
-    0%   { transform: translateY(105vh) rotate(0deg);   opacity: 0; }
-    8%   { opacity: 0.18; }
-    88%  { opacity: 0.12; }
-    100% { transform: translateY(-8vh) rotate(540deg);  opacity: 0; }
 }
 
 /* ═══════════════════════════════════════════
@@ -572,7 +555,7 @@ hr { border-color: rgba(255,255,255,0.06) !important; }
 /* Prediction Engine — model cards & Final cross-check (Tab 5) */
 .model-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     margin-bottom: 1rem;
 }
@@ -608,7 +591,7 @@ hr { border-color: rgba(255,255,255,0.06) !important; }
 }
 .crosscheck-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 10px;
     margin: 0.6rem 0 1.2rem;
 }
@@ -647,23 +630,6 @@ st.markdown("""
 <div class="bg-overlay"></div>
 <div class="spotlight"></div>
 <div class="pitch-lines"></div>
-
-<!-- Floating football particles -->
-<span class="particle" style="left:3%;font-size:1.8rem;animation:floatBall 14s 0s linear infinite;">⚽</span>
-<span class="particle" style="left:10%;font-size:1.1rem;animation:floatBall 11s 2s linear infinite;">⚽</span>
-<span class="particle" style="left:18%;font-size:1.5rem;animation:floatBall 17s 4.5s linear infinite;">⚽</span>
-<span class="particle" style="left:26%;font-size:0.9rem;animation:floatBall 12s 1s linear infinite;">⚽</span>
-<span class="particle" style="left:35%;font-size:2rem;animation:floatBall 19s 6s linear infinite;">⚽</span>
-<span class="particle" style="left:43%;font-size:1.3rem;animation:floatBall 13s 3s linear infinite;">⚽</span>
-<span class="particle" style="left:51%;font-size:1.6rem;animation:floatBall 15s 8s linear infinite;">⚽</span>
-<span class="particle" style="left:59%;font-size:1rem;animation:floatBall 10s 0.5s linear infinite;">⚽</span>
-<span class="particle" style="left:67%;font-size:1.4rem;animation:floatBall 18s 5s linear infinite;">⚽</span>
-<span class="particle" style="left:75%;font-size:0.8rem;animation:floatBall 12s 2.5s linear infinite;">⚽</span>
-<span class="particle" style="left:82%;font-size:1.7rem;animation:floatBall 14s 7s linear infinite;">⚽</span>
-<span class="particle" style="left:90%;font-size:1.2rem;animation:floatBall 11s 1.5s linear infinite;">⚽</span>
-<span class="particle" style="left:97%;font-size:1.5rem;animation:floatBall 16s 4s linear infinite;">⚽</span>
-<span class="particle" style="left:55%;font-size:0.9rem;animation:floatBall 9s 9s linear infinite;">🏆</span>
-<span class="particle" style="left:30%;font-size:1.1rem;animation:floatBall 13s 11s linear infinite;">🏆</span>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
@@ -723,6 +689,20 @@ def cached_group_sim(group: str, results_key: str):
             "p4th": pos_dict[3] / 5000,
         }
     return result
+
+
+@st.cache_data(show_spinner="Fetching live FIFA World Rankings…", ttl=3600)
+def cached_fifa_rankings():
+    """
+    Live FIFA World Ranking comparison table (informational only — does
+    NOT feed into Elo, the Poisson model, or the Monte Carlo simulation).
+    Falls back to {} if the live source is unreachable; callers should
+    treat that as "show static model ranks only".
+    """
+    try:
+        return get_fifa_rankings_table()
+    except Exception:
+        return {}
 
 
 # ---------------------------------------------------------------------------
@@ -802,6 +782,86 @@ def cached_logreg_model():
 
 
 # ---------------------------------------------------------------------------
+# Random Forest & XGBoost models (cached resources — trained once per session)
+#
+# Unlike the logistic model (trained on ~900 WC-only matches), these two
+# train on the "recent era" of ALL international results (every
+# competition, not just World Cups) — far more rows, which non-linear
+# tree ensembles can make better use of. RECENT_ERA_START bounds that
+# window so training stays on data that reflects the modern game.
+# ---------------------------------------------------------------------------
+RECENT_ERA_START = "2010-01-01"
+
+
+@st.cache_resource(show_spinner="Training random forest on recent-era results…")
+def cached_rf_model():
+    """
+    Train the random-forest match predictor on international results since
+    RECENT_ERA_START. Falls back to an untrained model (pure Elo-based
+    estimate) if historical data can't be fetched.
+    """
+    from models.random_forest import RandomForestMatchPredictor
+    try:
+        from data.historical import fetch_results, compute_elo_ratings, build_form_lookup
+        df = fetch_results()
+        if df is None:
+            return RandomForestMatchPredictor(), False
+        recent_df = df[df["date"] >= RECENT_ERA_START]
+        elos = compute_elo_ratings(df)
+        form_lookup = build_form_lookup(df)
+        if recent_df is None or len(recent_df) < 200 or not elos:
+            return RandomForestMatchPredictor(), False
+        model = RandomForestMatchPredictor.train_from_history(recent_df, elos, form_lookup)
+        return model, model.trained
+    except Exception:
+        return RandomForestMatchPredictor(), False
+
+
+@st.cache_resource(show_spinner="Training XGBoost on recent-era results…")
+def cached_xgb_model():
+    """
+    Train the XGBoost match predictor on international results since
+    RECENT_ERA_START. Falls back to an untrained model (pure Elo-based
+    estimate) if historical data or the xgboost package isn't available.
+    """
+    from models.xgboost_model import XGBoostMatchPredictor
+    try:
+        from data.historical import fetch_results, compute_elo_ratings, build_form_lookup
+        df = fetch_results()
+        if df is None:
+            return XGBoostMatchPredictor(), False
+        recent_df = df[df["date"] >= RECENT_ERA_START]
+        elos = compute_elo_ratings(df)
+        form_lookup = build_form_lookup(df)
+        if recent_df is None or len(recent_df) < 200 or not elos:
+            return XGBoostMatchPredictor(), False
+        model = XGBoostMatchPredictor.train_from_history(recent_df, elos, form_lookup)
+        return model, model.trained
+    except Exception:
+        return XGBoostMatchPredictor(), False
+
+
+# ---------------------------------------------------------------------------
+# Historical model backtest (2018 & 2022 World Cups)
+#
+# Trains separate, point-in-time copies of every model (using only data
+# available before each tournament kicked off) and scores them against that
+# tournament's actual results. Cached for 24h since it retrains RF/XGBoost
+# twice; gated behind a button in the UI so it doesn't run on every page load.
+# ---------------------------------------------------------------------------
+@st.cache_data(show_spinner="Running point-in-time backtest on 2018 & 2022 World Cups…", ttl=86400)
+def cached_backtest():
+    from models.backtest import run_full_backtest
+    try:
+        return run_full_backtest(years=(2018, 2022), n_mc_sims=5000)
+    except Exception as e:
+        return {
+            2018: {"year": 2018, "error": str(e)},
+            2022: {"year": 2022, "error": str(e)},
+        }
+
+
+# ---------------------------------------------------------------------------
 # Build results key for cache
 # ---------------------------------------------------------------------------
 def results_key() -> str:
@@ -811,12 +871,13 @@ def results_key() -> str:
 # ---------------------------------------------------------------------------
 # Tabs
 # ---------------------------------------------------------------------------
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "🏆 Win Probabilities",
     "📊 Group Predictions",
     "📍 Match Predictor",
     "📈 Live Tracker",
     "🗺️ Bracket",
+    "🧪 Model Backtest",
 ])
 
 # ============================================================================
@@ -865,6 +926,52 @@ with tab1:
 
     df = pd.DataFrame(rows)
     st.dataframe(df, use_container_width=True, hide_index=True)
+
+    # -----------------------------------------------------------------
+    # Live FIFA World Ranking (vs. model) — informational comparison only
+    # -----------------------------------------------------------------
+    with st.expander("🌍 Live FIFA World Ranking vs. model rank"):
+        st.caption(
+            "Live ranks are pulled from the current published FIFA World Ranking. "
+            "This panel is for comparison only — it does **not** feed into the "
+            "Elo ratings, Poisson model, or Monte Carlo simulation above."
+        )
+        fifa_table = cached_fifa_rankings()
+        if not fifa_table or not any(v["live_rank"] is not None for v in fifa_table.values()):
+            st.warning(
+                "Live FIFA rankings aren't reachable right now — showing this "
+                "app's static model ranks only (live source may be temporarily "
+                "unavailable, e.g. on a network-restricted host)."
+            )
+        else:
+            fifa_rows = []
+            for team, info in fifa_table.items():
+                delta = info["delta"]
+                if delta is None:
+                    delta_str = "—"
+                elif delta > 0:
+                    delta_str = f"▲ live {delta} better"
+                elif delta < 0:
+                    delta_str = f"▼ live {abs(delta)} worse"
+                else:
+                    delta_str = "= same"
+                fifa_rows.append({
+                    "Team": f"{TEAMS[team]['flag']} {team}",
+                    "Model Rank": info["static_rank"],
+                    "Live FIFA Rank": info["live_rank"] if info["live_rank"] is not None else "—",
+                    "Live Points": f"{info['live_points']:.0f}" if info["live_points"] is not None else "—",
+                    "Δ Model vs. Live": delta_str,
+                })
+            sort_key = lambda r: r["Live FIFA Rank"] if isinstance(r["Live FIFA Rank"], int) else r["Model Rank"]
+            fifa_rows.sort(key=sort_key)
+            fifa_df = pd.DataFrame(fifa_rows)
+            st.dataframe(fifa_df, use_container_width=True, hide_index=True)
+            st.caption(
+                "▲ = live FIFA ranking is BETTER (lower number) than this app's static "
+                "model rank, i.e. the model may be underrating that team. "
+                "▼ = live ranking is worse than the model rank. "
+                "Source: FIFA World Ranking (via whereig.com), cached up to 24h."
+            )
 
     st.markdown("---")
     st.info(
@@ -1348,12 +1455,19 @@ with tab5:
     # ── Prediction Engine: models behind this bracket ─────────────────────────
     st.markdown("#### 🧠 Prediction Engine")
     st.caption(
-        "Every probability on this page comes from the same pipeline — four "
-        "models working together, calibrated on real World Cup history."
+        "Every probability on this page comes from the same pipeline — six "
+        "models working together, calibrated on real World Cup and "
+        "international results."
     )
 
     logreg_model, logreg_trained = cached_logreg_model()
     logreg_status = "Trained on WC history" if logreg_trained else "Elo fallback (offline)"
+
+    rf_model, rf_trained = cached_rf_model()
+    rf_status = "Trained on recent-era results" if rf_trained else "Elo fallback"
+
+    xgb_model, xgb_trained = cached_xgb_model()
+    xgb_status = "Trained on recent-era results" if xgb_trained else "Elo fallback"
 
     model_html = (
         '<div class="model-grid">'
@@ -1382,11 +1496,26 @@ with tab5:
         'cross-check on the Final.</div>'
         f'<div class="model-card-status">{logreg_status}</div>'
         '</div>'
+        '<div class="model-card">'
+        '<div class="model-card-title">🌲 Random Forest</div>'
+        '<div class="model-card-body">Bagged-tree ensemble trained on '
+        f'international results since {RECENT_ERA_START[:4]} — captures '
+        'non-linear patterns the linear model misses, used as a further '
+        'cross-check on the Final.</div>'
+        f'<div class="model-card-status">{rf_status}</div>'
+        '</div>'
+        '<div class="model-card">'
+        '<div class="model-card-title">⚡ XGBoost</div>'
+        '<div class="model-card-body">Gradient-boosted-tree ensemble over '
+        f'the same recent-era ({RECENT_ERA_START[:4]}+) results and feature '
+        'set — a final independent cross-check on the Final.</div>'
+        f'<div class="model-card-status">{xgb_status}</div>'
+        '</div>'
         '</div>'
     )
     st.markdown(model_html, unsafe_allow_html=True)
 
-    # ── Final cross-check: Monte Carlo bracket vs. Logistic Regression ────────
+    # ── Final cross-check: Monte Carlo bracket vs. ML models ──────────────────
     lf, rf = bracket_info["left_finalist"], bracket_info["right_finalist"]
     champion, champ_prob = bracket_info["champion"], bracket_info["champ_prob"]
     logreg_probs = logreg_model.predict(
@@ -1395,11 +1524,20 @@ with tab5:
     logreg_pick = lf if logreg_probs["home_win"] >= logreg_probs["away_win"] else rf
     agree = "✅ Agrees with Monte Carlo" if logreg_pick == champion else "⚠️ Differs from Monte Carlo"
 
-    st.markdown("##### 🔍 Final Cross-Check — Monte Carlo Bracket vs. Logistic Regression")
+    rf_probs = rf_model.predict(home_elo=get_elo(lf), away_elo=get_elo(rf), is_neutral=True)
+    rf_pick = lf if rf_probs["home_win"] >= rf_probs["away_win"] else rf
+    rf_agree = "✅ Agrees with Monte Carlo" if rf_pick == champion else "⚠️ Differs from Monte Carlo"
+
+    xgb_probs = xgb_model.predict(home_elo=get_elo(lf), away_elo=get_elo(rf), is_neutral=True)
+    xgb_pick = lf if xgb_probs["home_win"] >= xgb_probs["away_win"] else rf
+    xgb_agree = "✅ Agrees with Monte Carlo" if xgb_pick == champion else "⚠️ Differs from Monte Carlo"
+
+    st.markdown("##### 🔍 Final Cross-Check — Monte Carlo Bracket vs. ML Models")
     st.caption(
         f"The bracket's projected Final is {get_flag(lf)} {lf} vs {get_flag(rf)} {rf}. "
-        "Compare the Monte Carlo simulation's overall champion pick against an "
-        "independent logistic-regression read of that single match."
+        "Compare the Monte Carlo simulation's overall champion pick against "
+        "independent reads of that single match from the logistic regression, "
+        "random forest, and XGBoost models."
     )
     cc_html = (
         '<div class="crosscheck-grid">'
@@ -1420,9 +1558,103 @@ with tab5:
         f'<div class="crosscheck-value">{get_flag(logreg_pick)} {logreg_pick}</div>'
         f'<div class="crosscheck-sub">{agree}</div>'
         '</div>'
+        '<div class="crosscheck-card">'
+        '<div class="crosscheck-label">Random Forest · Pick</div>'
+        f'<div class="crosscheck-value">{get_flag(rf_pick)} {rf_pick}</div>'
+        f'<div class="crosscheck-sub">{rf_agree}</div>'
+        '</div>'
+        '<div class="crosscheck-card">'
+        '<div class="crosscheck-label">XGBoost · Pick</div>'
+        f'<div class="crosscheck-value">{get_flag(xgb_pick)} {xgb_pick}</div>'
+        f'<div class="crosscheck-sub">{xgb_agree}</div>'
+        '</div>'
         '</div>'
     )
     st.markdown(cc_html, unsafe_allow_html=True)
+
+# ============================================================================
+# TAB 6 — Model Backtest
+# ============================================================================
+with tab6:
+    st.subheader("🧪 Model Backtest — 2018 & 2022 World Cups")
+    st.caption(
+        "Point-in-time evaluation: each model is retrained using only data "
+        "available BEFORE that tournament's opening match, then scored "
+        "against the actual results — so models aren't graded on data they "
+        "were trained on."
+    )
+
+    if st.button("▶️ Run backtest", help="Trains separate point-in-time copies of "
+                  "Logistic Regression, Random Forest and XGBoost — first run can "
+                  "take 15-30 seconds, then it's cached for 24 hours."):
+        st.session_state["backtest_results"] = cached_backtest()
+
+    backtest_results = st.session_state.get("backtest_results")
+
+    if backtest_results is None:
+        st.info(
+            "Click **Run backtest** to evaluate Elo, Elo+Poisson, Monte Carlo, "
+            "Logistic Regression, Random Forest, and XGBoost against the actual "
+            "2018 and 2022 World Cup results."
+        )
+    else:
+        any_ok = False
+        for year in (2018, 2022):
+            res = backtest_results.get(year, {})
+            if "error" in res:
+                st.warning(f"{year}: {res['error']}")
+                continue
+            any_ok = True
+
+            st.markdown(f"#### {year} FIFA World Cup &nbsp;·&nbsp; {res['n_matches']} matches")
+            st.caption(
+                f"Point-in-time training data (as of kickoff): "
+                f"{res['n_train_wc']} prior World Cup matches for Logistic "
+                f"Regression, {res['n_train_recent']:,} recent-era matches "
+                f"(since {RECENT_ERA_START[:4]}) for Random Forest / XGBoost. "
+                f"Random Forest trained: {'✅' if res['rf_trained'] else '⚠️ fallback to Elo'} "
+                f"&nbsp;·&nbsp; XGBoost trained: {'✅' if res['xgb_trained'] else '⚠️ fallback to Elo'} "
+                f"&nbsp;·&nbsp; Logistic Regression trained: "
+                f"{'✅' if res['logreg_trained'] else '⚠️ fallback to Elo'}"
+            )
+
+            summary_rows = [
+                {
+                    "Model": name,
+                    "Accuracy": f"{m['accuracy']:.1%}",
+                    "Brier Score": f"{m['brier']:.3f}",
+                    "Matches Scored": m["n"],
+                }
+                for name, m in res["models"].items()
+            ]
+            st.dataframe(pd.DataFrame(summary_rows), hide_index=True, use_container_width=True)
+
+            best_brier = min(res["models"].items(), key=lambda kv: kv[1]["brier"])
+            best_acc = max(res["models"].items(), key=lambda kv: kv[1]["accuracy"])
+            st.caption(
+                f"Best calibration (lowest Brier): **{best_brier[0]}** "
+                f"({best_brier[1]['brier']:.3f}) &nbsp;·&nbsp; "
+                f"Best accuracy: **{best_acc[0]}** ({best_acc[1]['accuracy']:.1%})"
+            )
+
+            with st.expander(f"Match-by-match picks — {year}"):
+                st.dataframe(
+                    pd.DataFrame(res["match_details"]),
+                    hide_index=True,
+                    use_container_width=True,
+                )
+            st.divider()
+
+        if any_ok:
+            st.caption(
+                "Accuracy = share of matches where the model's most-likely "
+                "outcome matched the actual result. Brier score (multi-class, "
+                "range 0-2, lower is better) = sum of squared errors between "
+                "predicted and actual outcome probabilities — rewards "
+                "well-calibrated confidence, not just correct picks. "
+                "'Monte Carlo' draws 5,000 scorelines per match from the same "
+                "Elo→Poisson distribution used by the live tournament simulator."
+            )
 
 # ---------------------------------------------------------------------------
 # Footer
@@ -1430,7 +1662,8 @@ with tab5:
 st.markdown(
     "<div class='footer-bar'>"
     "⚽ Goal Analytics &nbsp;·&nbsp; FIFA World Cup 2026 &nbsp;·&nbsp; "
-    "Elo + Bivariate Poisson + Logistic Regression + Monte Carlo &nbsp;·&nbsp; "
+    "Elo + Bivariate Poisson + Logistic Regression + Monte Carlo + "
+    "Random Forest + XGBoost &nbsp;·&nbsp; "
     "<a href='https://github.com/nithinnarla/goal-analytics' target='_blank'>GitHub ↗</a>"
     "</div>",
     unsafe_allow_html=True,
