@@ -1,4 +1,4 @@
-# ⚽ GoalAnalytics: A Multi-Model Forecasting System for the 2026 FIFA World Cup
+# ⚽ Goal Analytics: A Multi-Model Forecasting System for the 2026 FIFA World Cup
 
 **Module 1 of 3 · Elo + Poisson + Logistic Regression + Random Forest + XGBoost + Monte Carlo simulation**
 **Built and validated live during the tournament**
@@ -247,7 +247,7 @@ goal-analytics/
 
 - [x] Module 1: Elo + Poisson + Logistic Regression + Random Forest + XGBoost + Monte Carlo, with point-in-time backtesting against 2018 & 2022
 - [ ] Module 2: Player2Vec squad embeddings (post-tournament)
-- [ ] Module 3: ILP fantasy squad optimizer (pre-Euro 2027)
+- [ ] Module 3: ILP fantasy squad optimizer (pre-Euro 2028)
 
 ---
 
