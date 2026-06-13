@@ -408,12 +408,15 @@ def plot_model_comparison(
     rf_probs: dict | None = None,
     xgb_probs: dict | None = None,
     mc_probs: dict | None = None,
+    logistic_trained: bool = True,
+    elo_label: str = "Elo",
 ) -> plt.Figure:
     """
     Grouped bar chart comparing model win-probability predictions for one match.
 
     Each probs dict has keys {home_win, draw, away_win} (fractions, ~sum to 1):
-      elo_probs       – models.poisson.match_result_probs_poisson()        (required)
+      elo_probs       – models.elo.match_probabilities(), or
+                         models.poisson.match_result_probs_poisson()       (required)
       logistic_probs  – models.logistic.LogisticMatchPredictor.predict()   (required)
       rf_probs        – models.random_forest.RandomForestMatchPredictor.predict()  (optional)
       xgb_probs       – models.xgboost_model.XGBoostMatchPredictor.predict()       (optional)
@@ -427,13 +430,23 @@ def plot_model_comparison(
     silently fall back to an Elo-based estimate when untrained (check their
     .trained attribute) — callers may prefer to omit rf_probs/xgb_probs in
     that case rather than show a near-duplicate Elo bar.
+
+    logistic_trained – set to False (or LogisticMatchPredictor.trained) when
+                        logistic_probs actually came from the Elo fallback
+                        (e.g. scikit-learn unavailable / no training data).
+                        Adjusts the legend label so the chart doesn't claim
+                        a trained model was used.
+    elo_label        – override the elo_probs bar label, e.g. "Elo+Poisson"
+                        if elo_probs came from a Poisson-based model.
     """
     outcomes = ["Home Win", "Draw", "Away Win"]
     keys     = ["home_win", "draw", "away_win"]
 
+    logistic_label = "Logistic Reg" if logistic_trained else "Logistic (Elo fallback)"
+
     candidates = [
-        ("Elo+Poisson",   elo_probs,      PALETTE[0]),
-        ("Logistic Reg",  logistic_probs, PALETTE[1]),
+        (elo_label,       elo_probs,      PALETTE[0]),
+        (logistic_label,  logistic_probs, PALETTE[1]),
         ("Random Forest", rf_probs,       PALETTE[2]),
         ("XGBoost",       xgb_probs,      PALETTE[3]),
         ("Monte Carlo",   mc_probs,       PALETTE[4]),

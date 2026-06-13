@@ -659,8 +659,16 @@ def _load_actual_results():
     try:
         with open(_RESULTS_FILE) as f:
             raw = json.load(f)
-        return {k: tuple(v) for k, v in raw.items()}
-    except (FileNotFoundError, json.JSONDecodeError):
+        if not isinstance(raw, dict):
+            return {}
+        results = {}
+        for k, v in raw.items():
+            try:
+                results[k] = tuple(v)
+            except (TypeError, ValueError):
+                continue
+        return results
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
         return {}
 
 

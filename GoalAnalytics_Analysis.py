@@ -263,7 +263,10 @@ log_probs_arg_fra = logistic_model.predict(
     home_form=form_lookup.get("Argentina", {}).get("form", 1.5) if results_df else 1.5,
     away_form=form_lookup.get("France",    {}).get("form", 1.5) if results_df else 1.5,
 )
-fig06 = plot_model_comparison("Argentina", "France", elo_probs_arg_fra, log_probs_arg_fra)
+fig06 = plot_model_comparison(
+    "Argentina", "France", elo_probs_arg_fra, log_probs_arg_fra,
+    logistic_trained=logistic_model.trained,
+)
 save_fig(fig06, "06_model_comparison_arg_fra.png")
 plt.close(fig06)
 
