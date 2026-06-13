@@ -648,10 +648,30 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
-# Session state: actual results input by user
+# Session state: actual results input by user (persisted to disk so they
+# survive page reloads, new browser sessions, and app restarts)
 # ---------------------------------------------------------------------------
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_RESULTS_FILE = os.path.join(_PROJECT_ROOT, "data", "actual_results.json")
+
+
+def _load_actual_results():
+    try:
+        with open(_RESULTS_FILE) as f:
+            raw = json.load(f)
+        return {int(k): tuple(v) for k, v in raw.items()}
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_actual_results(results):
+    os.makedirs(os.path.dirname(_RESULTS_FILE), exist_ok=True)
+    with open(_RESULTS_FILE, "w") as f:
+        json.dump({str(k): list(v) for k, v in results.items()}, f)
+
+
 if "actual_results" not in st.session_state:
-    st.session_state.actual_results = {}  # match_id -> (hg, ag)
+    st.session_state.actual_results = _load_actual_results()  # match_id -> (hg, ag)
 
 # ---------------------------------------------------------------------------
 # Cache heavy computation
@@ -1170,6 +1190,7 @@ with tab4:
         )
         if col_btn.button("Save", key=f"save_{fix.match_id}"):
             st.session_state.actual_results[fix.match_id] = (int(hg), int(ag))
+            _save_actual_results(st.session_state.actual_results)
             st.success(f"Saved: {fix.home} {hg}-{ag} {fix.away}")
             st.rerun()
 
@@ -1239,6 +1260,7 @@ with tab4:
 
         if st.button("🗑️ Clear all results"):
             st.session_state.actual_results = {}
+            _save_actual_results(st.session_state.actual_results)
             st.rerun()
 
 # ============================================================================
