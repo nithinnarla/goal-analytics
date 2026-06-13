@@ -659,7 +659,7 @@ def _load_actual_results():
     try:
         with open(_RESULTS_FILE) as f:
             raw = json.load(f)
-        return {int(k): tuple(v) for k, v in raw.items()}
+        return {k: tuple(v) for k, v in raw.items()}
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
@@ -667,7 +667,7 @@ def _load_actual_results():
 def _save_actual_results(results):
     os.makedirs(os.path.dirname(_RESULTS_FILE), exist_ok=True)
     with open(_RESULTS_FILE, "w") as f:
-        json.dump({str(k): list(v) for k, v in results.items()}, f)
+        json.dump({k: list(v) for k, v in results.items()}, f)
 
 
 if "actual_results" not in st.session_state:
