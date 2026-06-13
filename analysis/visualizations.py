@@ -24,13 +24,15 @@ Charts produced:
                                 from models.backtest.run_full_backtest()'s
                                 {2018, 2022} output, with graceful handling of
                                 its {"error": ...} case (e.g. offline sandbox).
-  07. knockout_bracket       – Bracket tree. Build with build_bracket_from_simulation()
-                                (real WC2026 Annex-C bracket, from
-                                models.monte_carlo.simulate_full_tournament_detailed() —
-                                matches the dashboard) or, for a quick illustrative
-                                figure only, build_predicted_bracket() (simplified
-                                "higher seed always wins" seeding — see its docstring
-                                for why it does NOT match the live app).
+  07. knockout_bracket       – No longer a figure. build_predicted_bracket()
+                                returns a data-only dict (top-32-by-win-prob
+                                seeding, "higher seed always wins") used by
+                                GoalAnalytics_Analysis.py to print a simplified
+                                knockout-stage summary. 07_knockout_bracket.png
+                                was dropped in commit ac3f969 as inaccurate —
+                                the dashboard's real Bracket tab is driven
+                                separately by
+                                models.monte_carlo.simulate_full_tournament_detailed().
   08. host_advantage         – USA/Mexico/Canada home xG boost
 """
 import os
@@ -41,7 +43,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sns
-from typing import Dict, Tuple
 
 warnings.filterwarnings("ignore")
 matplotlib.use("Agg")  # non-interactive backend (safe for scripts + notebooks)
@@ -559,107 +560,6 @@ def plot_backtest_results(backtest_results: dict) -> plt.Figure:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 07. Knockout bracket
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _draw_bracket_node(ax, x, y, text, color=PANEL_BG, width=2.2, height=0.5,
-                        fontsize=7.5, text_color=TEXT):
-    rect = mpatches.FancyBboxPatch(
-        (x - width/2, y - height/2), width, height,
-        boxstyle="round,pad=0.05", linewidth=1,
-        edgecolor=ACCENT, facecolor=color,
-    )
-    ax.add_patch(rect)
-    ax.text(x, y, text, ha="center", va="center", fontsize=fontsize,
-            color=text_color, fontweight="bold")
-
-
-def plot_knockout_bracket(
-    bracket: dict,
-    title: str = "Predicted Knockout Bracket — WC 2026",
-) -> plt.Figure:
-    """
-    Bracket tree visualization.
-    bracket: dict with keys 'r32', 'r16', 'qf', 'sf', 'final', 'winner'
-             each being a list of predicted winners (team names)
-    e.g. bracket['r32'] = [32 team names in seeded order]
-
-    Optional key 'third_place': (winner, loser) tuple for the 3rd-place
-    playoff (match 103). If present, it's drawn as an extra annotation
-    near the Final — build_bracket_from_simulation() sets this key.
-    """
-    fig, ax = plt.subplots(figsize=(22, 18))
-    ax.set_xlim(0, 14)
-    ax.set_ylim(-1, 33)
-    ax.axis("off")
-    fig.patch.set_facecolor(DARK_BG)
-    ax.set_facecolor(DARK_BG)
-
-    # Round x positions
-    round_x = {"r32": 1.3, "r16": 3.8, "qf": 6.3, "sf": 8.8, "final": 11.3, "winner": 13.0}
-    round_labels = {"r32": "Round of 32", "r16": "Round of 16", "qf": "Quarterfinals",
-                    "sf": "Semifinals", "final": "Final", "winner": "🏆 Champion"}
-    round_order = ["r32", "r16", "qf", "sf", "final", "winner"]
-    for rnd, x in round_x.items():
-        ax.text(x, 32.5, round_labels[rnd], ha="center", va="center",
-                fontsize=9, color=ACCENT, fontweight="bold")
-
-    def y_positions(n):
-        return [1 + (32 / n) * i + (16 / n) - 0.5 for i in range(n)]
-
-    # Draw each round (iterate over round_order, not bracket.items(), so extra
-    # keys such as 'third_place' aren't treated as a round of team boxes)
-    for rnd in round_order:
-        teams = bracket.get(rnd)
-        if not teams:
-            continue
-        x = round_x[rnd]
-        ys = y_positions(len(teams))
-        for team, y in zip(teams, ys):
-            color = GOLD if rnd == "winner" else PANEL_BG
-            text_c = DARK_BG if rnd == "winner" else TEXT
-            _draw_bracket_node(ax, x, y, team, color=color, text_color=text_c,
-                                fontsize=7.0 if len(teams) > 8 else 8.0)
-
-    # Connect lines between rounds
-    for ri in range(len(round_order) - 1):
-        r_from = round_order[ri]
-        r_to   = round_order[ri + 1]
-        if not bracket.get(r_from) or not bracket.get(r_to):
-            continue
-        ys_from = y_positions(len(bracket[r_from]))
-        ys_to   = y_positions(len(bracket[r_to]))
-        x_from  = round_x[r_from] + 1.15
-        x_to    = round_x[r_to]   - 1.15
-
-        for i, y_to in enumerate(ys_to):
-            # Connect pairs
-            pair = [ys_from[i*2], ys_from[i*2 + 1]] if i*2+1 < len(ys_from) else [ys_from[i*2]]
-            mid_y = np.mean(pair)
-            for y_from in pair:
-                ax.plot([x_from, x_from + 0.2, x_from + 0.2, x_to - 0.2, x_to - 0.2, x_to],
-                        [y_from, y_from, mid_y, mid_y, y_to, y_to],
-                        color=SUBTEXT, linewidth=0.6, alpha=0.5)
-
-    # Optional 3rd-place playoff annotation (match 103) — not part of the
-    # winner-advancement tree, so it's drawn as a standalone box rather than
-    # via round_x/round_order.
-    third_place = bracket.get("third_place")
-    if third_place:
-        tp_winner, tp_loser = third_place
-        _draw_bracket_node(
-            ax, round_x["final"], -0.5,
-            f"🥉 3rd Place: {tp_winner} def. {tp_loser}",
-            color=PANEL_BG, width=4.8, height=0.6, fontsize=8.5, text_color=GOLD,
-        )
-
-    ax.set_title(title, fontsize=15, fontweight="bold", color=TEXT,
-                 y=1.02, x=0.5, transform=ax.transAxes)
-    plt.tight_layout()
-    return fig
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # 08. Host advantage analysis
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -718,73 +618,6 @@ def plot_host_advantage() -> plt.Figure:
     return fig
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Utility: Generate predicted knockout bracket from sim results
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def build_bracket_from_simulation(match_results: Dict[int, Tuple[str, str]]) -> dict:
-    """
-    Build a plot_knockout_bracket()-compatible dict from the REAL WC2026 Annex-C
-    bracket simulation.
-
-    Parameters
-    ----------
-    match_results : dict
-        The second element returned by
-        models.monte_carlo.simulate_full_tournament_detailed() — a
-        {match_number: (winner, loser)} mapping for every knockout match,
-        matches 73-104 (16 Round-of-32 matches, 8 Round-of-16, 4 quarterfinals,
-        2 semifinals, the 3rd-place playoff (103), and the Final (104)).
-
-    Returns
-    -------
-    dict with keys:
-      'r32'    : 32 team names — match_results[m] (winner, loser) for each R32
-                 match m, in data.knockout_fixtures' LEFT_R32_ORDER +
-                 RIGHT_R32_ORDER order.
-      'r16'    : 16 team names — winners of the 16 R32 matches, same order
-                 (these are the entrants to the Round of 16).
-      'qf'     : 8 team names — winners of matches 89,90,93,94,91,92,95,96.
-      'sf'     : 4 team names — winners of matches 97,98,99,100.
-      'final'  : 2 team names — winners of matches 101,102.
-      'winner' : 1 team name — winner of match 104 (the Final).
-      'third_place' : (winner, loser) of match 103, if present in
-                 match_results — used by plot_knockout_bracket() to draw the
-                 3rd-place playoff annotation.
-
-    The list orderings above are derived from data.knockout_fixtures.BRACKET_TREE
-    so that plot_knockout_bracket()'s adjacent-pair connecting lines (round i
-    positions 2k/2k+1 -> round i+1 position k) reconstruct the real WC2026
-    bracket tree — this is THE bracket that matches the dashboard's Bracket tab,
-    unlike the simplified seeding from build_predicted_bracket() below.
-    """
-    from data.knockout_fixtures import LEFT_R32_ORDER, RIGHT_R32_ORDER
-
-    r32_order = list(LEFT_R32_ORDER) + list(RIGHT_R32_ORDER)
-
-    r32 = []
-    for m in r32_order:
-        r32.extend(match_results[m])  # (winner, loser) for this R32 match
-
-    r16 = [match_results[m][0] for m in r32_order]
-    qf  = [match_results[m][0] for m in (89, 90, 93, 94, 91, 92, 95, 96)]
-    sf  = [match_results[m][0] for m in (97, 98, 99, 100)]
-    final = [match_results[101][0], match_results[102][0]]
-    winner = [match_results[104][0]]
-
-    bracket = {
-        "r32": r32,
-        "r16": r16,
-        "qf": qf,
-        "sf": sf,
-        "final": final,
-        "winner": winner,
-    }
-    if 103 in match_results:
-        bracket["third_place"] = match_results[103]
-    return bracket
-
-
 def build_predicted_bracket(win_probs: dict) -> dict:
     """
     Construct a SIMPLIFIED, ILLUSTRATIVE bracket by taking the top 32 teams by
@@ -799,13 +632,16 @@ def build_predicted_bracket(win_probs: dict) -> dict:
     simulates every knockout match — including penalty shootouts — rather than
     always advancing the higher seed.
 
-    Use this function only for a quick illustrative bracket figure (feeds
-    plot_knockout_bracket) in notebooks/scripts that don't want to run a full
-    tournament simulation. If you need a bracket that matches what the
-    dashboard shows, call models.monte_carlo.simulate_full_tournament_detailed()
-    and pass its match_results to build_bracket_from_simulation() instead.
+    This is a data-only helper: it returns no figure. GoalAnalytics_Analysis.py
+    uses its output to print a quick "higher seed always wins" knockout-stage
+    summary (Sections 7-8) without running a full tournament simulation. For a
+    bracket that matches what the dashboard shows, run
+    models.monte_carlo.simulate_full_tournament_detailed() instead.
 
-    Returns dict suitable for plot_knockout_bracket().
+    Returns
+    -------
+    dict with keys 'r32', 'r16', 'qf', 'sf', 'final', 'winner', each a list of
+    team names (seeded order for 'r32'; predicted winners for later rounds).
     """
     sorted_teams = sorted(win_probs, key=win_probs.get, reverse=True)
     r32 = sorted_teams[:32]

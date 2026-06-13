@@ -180,8 +180,7 @@ python run.py
 # Launch interactive dashboard
 streamlit run dashboard/app.py
 
-# Run the standalone analysis script (mirrors GoalAnalytics_Analysis.ipynb,
-# writes figures to ./figures/)
+# Run the standalone analysis script (writes figures to ./figures/)
 python GoalAnalytics_Analysis.py
 
 # Run the 2018/2022 backtest from the command line
@@ -194,6 +193,10 @@ python -c "from models.backtest import run_full_backtest; print(run_full_backtes
 
 ```
 goal-analytics/
+├── .devcontainer/
+│   └── devcontainer.json     # Codespaces/dev-container config
+├── .streamlit/
+│   └── config.toml           # Streamlit theme/server config
 ├── data/
 │   ├── teams.py              # 48 WC2026 teams: groups, Elo, FIFA rank, confederation
 │   ├── fixtures.py           # All 72 group-stage fixtures

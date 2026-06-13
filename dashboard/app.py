@@ -1,11 +1,13 @@
 """
 Goal Analytics — World Cup 2026 Prediction Dashboard
 =====================================================
-Streamlit app with 4 tabs:
+Streamlit app with 6 tabs:
   1. 🏆 Win Probabilities  — who wins the tournament?
   2. 📊 Group Predictions  — predicted standings + match results
   3. 📍 Match Predictor    — enter any two teams, get scoreline odds
   4. 📈 Live Tracker       — enter actual results, track model accuracy
+  5. 🗺️ Bracket            — projected knockout bracket + ML cross-check
+  6. 🧪 Model Backtest     — point-in-time backtest vs. 2018 & 2022
 
 Run locally:  streamlit run dashboard/app.py
 """

@@ -3,7 +3,6 @@ Goal Analytics — Full Analysis Script
 =====================================
 World Cup 2026 AI Prediction Engine
 
-Matches GoalAnalytics_Analysis.ipynb cell-for-cell.
 Run this script to reproduce all visualizations and predictions.
 
 Usage
@@ -208,7 +207,6 @@ from analysis.visualizations import (
     plot_win_probabilities,
     plot_scoreline_heatmap,
     plot_model_comparison,
-    plot_knockout_bracket,
     plot_host_advantage,
     build_predicted_bracket,
     save_fig,
@@ -270,12 +268,11 @@ fig06 = plot_model_comparison(
 save_fig(fig06, "06_model_comparison_arg_fra.png")
 plt.close(fig06)
 
-# Fig 07 — Knockout bracket
-print("  07/08 Predicted knockout bracket...")
+# Fig 07 — Knockout bracket (data only — no figure; 07_knockout_bracket.png
+# was dropped in commit ac3f969 as inaccurate). The bracket dict computed here
+# feeds the knockout-stage printout in Sections 7-8 below.
+print("  07/08 Predicted knockout bracket (data only, no figure)...")
 bracket = build_predicted_bracket(win_probs)
-fig07 = plot_knockout_bracket(bracket)
-save_fig(fig07, "07_knockout_bracket.png")
-plt.close(fig07)
 
 # Fig 08 — Host advantage
 print("  08/08 Host nation advantage...")
