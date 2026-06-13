@@ -1,5 +1,5 @@
 """
-GoalAnalytics — CLI runner
+Goal Analytics — CLI runner
 Prints pre-tournament win probabilities and group predictions to stdout.
 Usage:  python run.py
 """
@@ -13,7 +13,7 @@ from data.teams import get_elo
 
 def main():
     print("\n" + "="*60)
-    print("  ⚽  GoalAnalytics — World Cup 2026 Predictions")
+    print("  ⚽  Goal Analytics — World Cup 2026 Predictions")
     print("  Elo + Bivariate Poisson + Monte Carlo (10,000 sims)")
     print("="*60)
 

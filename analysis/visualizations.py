@@ -1,5 +1,5 @@
 """
-All visualization functions for GoalAnalytics.
+All visualization functions for Goal Analytics.
 
 Every function returns a matplotlib Figure so it can be:
   - Displayed inline in Jupyter:  display(fig) or just fig

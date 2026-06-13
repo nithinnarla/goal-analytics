@@ -1,5 +1,5 @@
 """
-GoalAnalytics — Full Analysis Script
+Goal Analytics — Full Analysis Script
 =====================================
 World Cup 2026 AI Prediction Engine
 
@@ -33,7 +33,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 print("=" * 60)
-print("GoalAnalytics — World Cup 2026 Prediction Engine")
+print("Goal Analytics — World Cup 2026 Prediction Engine")
 print("=" * 60)
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 """
-GoalAnalytics — World Cup 2026 Prediction Dashboard
+Goal Analytics — World Cup 2026 Prediction Dashboard
 =====================================================
 Streamlit app with 4 tabs:
   1. 🏆 Win Probabilities  — who wins the tournament?

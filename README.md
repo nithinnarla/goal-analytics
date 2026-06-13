@@ -15,7 +15,7 @@ Goal Analytics forecasts match outcomes and tournament progression for the 2026 
 
 ## 1. Introduction
 
-International football outcomes are notoriously hard to predict: a 48-team, single-elimination-heavy tournament compresses a season's worth of variance into a month. GoalAnalytics treats this as a forecasting problem with two layers:
+International football outcomes are notoriously hard to predict: a 48-team, single-elimination-heavy tournament compresses a season's worth of variance into a month. Goal Analytics treats this as a forecasting problem with two layers:
 
 1. **Match-level models** — given two teams (and venue context), estimate P(home win), P(draw), P(away win), and the most likely scoreline.
 2. **Tournament-level simulation** — repeatedly sample match-level outcomes across the full 104-match bracket to estimate each team's probability of reaching the Round of 32, Round of 16, quarter-finals, semi-finals, the final, and the title.
