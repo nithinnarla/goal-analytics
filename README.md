@@ -3,7 +3,7 @@
 **Module 1 of 3 · Elo + Poisson + Logistic Regression + Random Forest + XGBoost + Monte Carlo simulation**
 **Built and validated live during the tournament**
 
-**[→ Live Dashboard](https://goal-analytics.streamlit.app)** · **[→ Substack](https://substack.com/@nithinnarla)**
+**[→ Live Dashboard](https://goal-analytics-wc2026.streamlit.app/)** · **[→ Substack](https://substack.com/@nithinnarla)**
 
 ---
 
